@@ -1,350 +1,300 @@
-# Research Idea Report：Training-free / 少训练 / 低资源的 LLM-MLLM 研究空间
+# Research Idea Report（v2，核实后重审版）：Training-free / 少训练 / 低资源的 LLM-MLLM 研究空间
 
 **Direction**：LLM/MLLM 推理效率、Test-Time Scaling、Continual Learning，以及其他不依赖（大规模）训练、单卡或 API 即可完成的研究方向——哪里还有空间、方向是什么、潜在 idea 有哪些。
-**Generated**：2026-10-17
-**Pipeline**：ARIS `/research-lit`（Phase 1 landscape）→ `/idea-creator` Phase 1.5 lens fan-out（4 个子方向 × 5 lens：method-transfer / contradiction / untested-assumption / scaling-regime / diagnostic）→ Phase 3 机械合并去重 → Phase 6 报告。
-**Ideas evaluated**：42 generated → 38 survived dedup → 0 piloted（本环境无 GPU）→ 12 recommended + 26 backlog
+**Generated**：2026-10-17（v1）→ **v2 同日核实后重审**
+**Pipeline**：ARIS `/research-lit` → `/idea-creator` Phase 1.5 lens fan-out（4 子方向 × 5 lens）→ Phase 3 机械去重 → **人工核实（Step 1.5 替代：arxiv.org/abs 逐篇 + CrossRef）→ 针对 top-12 的 novelty 探测（11 次 WebSearch + 21 篇新论文 abs 核实）→ 重排与重定位** → Phase 6 报告。
+**Ideas evaluated**：42 generated → 38 after dedup → **核实后：3 条淘汰（被 2026 H2 论文覆盖）、6 条降级、2 条从 backlog 升级** → 10 recommended + 24 backlog + 4 eliminated
 
-> **可信度与流程说明（必读）**
-> - 本环境的 egress 代理拦截了 `export.arxiv.org` / `arxiv.org` / `huggingface.co` / `openreview.net` / `semanticscholar.org`（CONNECT 403），`tools/arxiv_fetch.py` 不可用；按 research-lit 的 Policy D2 降级为 **WebSearch-only**（4 路共约 160 次查询）。所有 arXiv ID 来自搜索结果，**未读 abs/HTML 正文**，论文的关键数字与 limitation 来自摘要片段。四份 lens 报告里带 `⚠` / `[片段]` / `[未核实-记忆]` 标记的条目需在可访问环境二次核实。
-> - idea-creator 的 Phase 4 **跨模型 jury（Codex MCP）在本环境不可用**，排名由执行方（Claude）自评，按 `shared-references/acceptance-gate.md` 记为 `review_independence: same-family`, `acceptance_status: provisional`。下一步应跑 `/novelty-check` 与 `/research-review — reviewer: codex`。
-> - 用户写的 "llm tts" 有两种解读：**test-time scaling** 与 **语音 text-to-speech**，两者均已覆盖（§2.2 与 §2.4.8）。
-> - 四份 lens 原始报告（论文卡片 + 完整 gap 论证）在 `idea-stage/lens/`。
+> **v2 相对 v1 的变化（必读）**
+> - 四份 lens 报告（`idea-stage/lens/`）已逐篇核实：共 ~200 个 arXiv ID 抓 abs 页，关键数字抓 html grep；每份文件顶部新增「§0.5 核实记录」。修正包括：2 篇撤回论文（STU-PID 2506.18831 → 改引 2510.04309；PulseFocus 2603.04676）、2 个错误 ID、若干错误标题/数字、**4 篇 v1 写成 ICML/NeurIPS 主会的实为 workshop**（Audit Before You Merge、Is Our Benchmark Enough = ICML'26 CATS WS；CF-Router = ICLR'26 WS；GraphMemory = NeurIPS'26 TTCL WS）、3 篇 training-free 判断错误（RetentiveKV、DraftExpert、Prosodic Streaming 实为需训练）。
+> - **仍不可用**：arXiv API / Semantic Scholar / OpenAlex 因出口 IP 限速返回 429，所以 `verify_papers.py` 的 S2 层与 `arxiv_fetch.py search` 没跑；本次核实靠 abs 页人工替代。Codex 跨模型 jury 仍不可用，排名为同家族自评，`acceptance_status: provisional`。
+> - 核实与 novelty 探测的全部原始记录：`idea-stage/lens/*.md` §0.5 与 `idea-stage/novelty_probe_notes.md`。
 
 ---
 
 ## 0. 一页结论（TL;DR）
 
-**已经做烂、不建议再做"又一个方法"的子方向（红海）**
+**v1 判断中被核实推翻或削弱的三点**
+1. **语音 LLM-TTS 的 AR LM 侧已不是空白**：2026-08~09 连出 ECCD（[2608.00722](https://arxiv.org/abs/2608.00722)，training-free 对比解码治幻觉，CosyVoice2/3、WER −55.6%）、语速激活 steering（[2609.33810](https://arxiv.org/abs/2609.33810)，SLT'26，含 CosyVoice2）、口音中和 steering（[2603.05977](https://arxiv.org/abs/2603.05977)，SLT'26）、EmoShift/CoCoEmo。v1 的 Idea 12 两条子线均被覆盖，**淘汰**。
+2. **Steering 安全税的缓解已被做掉**：[2608.08383](https://arxiv.org/abs/2608.08383)（COLM'26，primal-dual 找单方向消融）、OPIUM [2607.19806](https://arxiv.org/abs/2607.19806)、[2605.01167](https://arxiv.org/abs/2605.01167)、Forecasting Side Effects [2608.11227](https://arxiv.org/abs/2608.11227)；且 Safety Pitfalls 本身已测过"正交投影只减 15–25%"。v1 的 Idea 2 **淘汰**。
+3. **"KV 压缩拉长输出"的现象已被发表**（ReCo [2608.04771](https://arxiv.org/abs/2608.04771)：R-KV 25% 压缩使 R1-Distill-Qwen-7B 长度 +38.8%、Llama-8B +79.0%；RLKV v3 [2510.08525](https://arxiv.org/abs/2510.08525) 同样观察），但 **ThinKV（ICLR'26 Oral）全文明确说"驱逐不导致长度增加、只有量化导致"**——两组顶会结论直接矛盾，机制无人解释、TF 修复无人做。v1 的 Idea 1 从"发现现象"**重定位为"解决矛盾 + 机制 + TF 修复"**，仍是效率方向的首选。
 
-| 子方向 | 证据 |
-|---|---|
-| 单图 LLaVA 上的 training-free 视觉 token 剪枝 | FastV→SparseVLM→VisionZip→HoloV→D²Pruner→TOPS 每月数篇；CVPR'26 [2512.07580](https://arxiv.org/abs/2512.07580) 与 [2502.11501](https://arxiv.org/abs/2502.11501) 证明 ≥20 层后不如随机剪枝 |
-| prefill 阶段 KV 驱逐 + 层/头预算分配；KV 驱逐 × 量化联合 | SnapKV/PyramidKV/LAVa/LU-KV/MixedDimKV；2026 上半年 RDKV/MoE-nD/HqeKV/CAPKV/ThinKV 密集涌现 |
-| "又一个旋转"式 PTQ | SpinQuant→SingleQuant→OptRot→ReSpinQuant |
-| 置信/熵驱动的自适应 self-consistency 与单轨迹 early-exit | 2025-08 至 2026-06 ≥15 篇用同一组信号（logprob、答案熵、试答置信、注意力、反思 token）：DeepConf、CGES、SeerSC、Parallel-Probe、DEER、CGRS、ARS、RPDI-EE、CoDE-Stop、ASAG… |
-| ViT 上 prompt-pool / LoRA-pool 的 class-incremental | L2P→CODA→GAP-Prompt、SD-LoRA/EWC-LoRA/SLAO；被 RanPAC/RanDumb/PAM/Fly-CL 等 TF 基线反复打平 |
-| MLLM 持续指令微调方法线 | HiDe-LLaVA/MR-LoRA/Routing/φ-DPO；ICML'26 "Is Our Benchmark Enough" 证明 TF 原型路由即可匹配 |
-| Activation steering 方法本体、文本 DoLa 系对比解码、prompt 优化 | COLD-Steer/ODESteer/GER-steer 在小基准比 1–6 点；LayerCake 撤回；GEPA 已工程化 |
+**仍成立的红海清单**（同 v1）：单图视觉 token 剪枝、prefill KV 驱逐与驱逐×量化联合、旋转式 PTQ、置信/熵早停与自适应 self-consistency、ViT prompt-pool CIL、MLLM 持续指令微调 LoRA 路由、activation steering 方法本体、文本 DoLa 系。**新增红海**：steering 安全税缓解、LM-TTS 的 TF 控制/去幻觉、反思 token 调度（CyclicReflex ICLR'26、Reflection Steering、ARLCP ICLR'26）。
 
-**仍有空间的六大主题（跨方向归纳，详见 §3）**
+**核实后仍有空间的主题**（按证据强度排序）
+1. **矛盾裁决类**：驱逐是否拉长输出（ThinKV vs ReCo/RLKV）；置信选择在难题上有效还是崩溃（DeepConf vs CGES vs Consilience）；attention 剪枝 vs 随机（HoloV/TOPS vs 2512.07580）。
+2. **跨社区统一类**：output-KL vs 权重空间量作为遗忘预测量（RL's Razor 只在 LLM/机器人 FM 验证，视觉 CIL 与合并未验证）；CTTA vs TF-CIL；预训练泄漏 ↔ TF-CL 优势。
+3. **新 regime 迁移类**：工具调用 agent 的 KV 压缩；KV 驱逐打分在 W4A4 旋转量化模型上；同图多问的 query-agnostic 视觉 KV；MLA/MoE 上的压缩；视频 M-RoPE 的逐维处理。
 
-1. **"token ≠ 延迟" 与压缩/早停的真实代价**：KV 压缩让模型"话变多"、early-exit 让 token 降但 wall-clock 升，几乎所有方法论文只报 token/s。诊断 + TF 修复均空白。
-2. **信号的失效相图**：置信类 TTS 选择器、注意力类剪枝、steering 向量都在"某些难度/模型/深度"失效，且顶会结论互相矛盾（DeepConf vs CGES vs Consilience；attention 剪枝 vs 随机）。没人画统一相图。
-3. **基准有效性审计**：预训练泄漏 ↔ TF-CL 优势；MLLM-CL 任务可分性；公共 LoRA 合并的 Δ≈0 伪影；VLM-TTS 增益在匹配解码格式后消失。LLM 侧对应审计缺位。
-4. **方法向新 regime 的迁移**：agent/工具调用/多轮、多图交错、长视频、端侧 ≤3B、MoE/MLA、W4A4 量化模型上几乎没有 TF 压缩/TTS/CL 评测。
-5. **跨社区统一**：CTTA vs TF-CIL；权重插值 vs 激活 steering；RAG/ICL vs 参数化 CL；KL-to-base vs 权重空间量作为遗忘预测量。两边各有一半工具，没人放进同一坐标系。
-6. **语音 LLM-TTS 的 AR 语义 token LM 侧**：training-free 控制只碰了 flow-matching（EmoSteer）或 EOS logit（TED-TTS）；LM 侧 steering、对比解码、自投机空白。
-
-**推荐优先执行**（全部单卡 ≤60 GPU-h 或 ≤$100 API，见 §4）：
-Idea 1 *Why Compression Makes Models Talk Longer* → Idea 2 *Steering Safety-Tax Audit + Refusal-Orthogonal Fix* → Idea 3 *ConfMap* → Idea 4 *PruneDraft* → Idea 5 *DPE-for-Video*。
+**核实后 Top-5**（全部单卡 ≤60 GPU-h）：
+Idea 1 *Eviction or Quantization: Who Makes Reasoning Models Talk Longer?* → Idea 2 *KL-Razor for Vision & Merging* → Idea 3 *Leakage-Stratified CL* → Idea 4 *ConfMap* → Idea 5 *One Stream, Two Communities*。
 
 ---
 
-## 1. 方法与来源
+## 1. 方法与来源（v2 增补）
 
 | 项目 | 内容 |
 |---|---|
-| Lens 子代理 | ① LLM/MLLM 推理效率（60 篇） ② Test-Time Scaling（55 篇） ③ Continual Learning（70 篇） ④ 其他方向广度扫描（64 篇） |
-| 时间窗 | 重点 2025-07 → 2026-10；锚点回溯到 2022–2025H1 |
-| 覆盖会议 | NeurIPS'25/26、ICLR'26、ICML'26、ACL'26、CVPR'26、AAAI'26、MLSys'25/26、COLM'26、Interspeech'25、EACL'26 |
-| 来源 | WebSearch（arXiv abs 摘要片段、会议 proceedings 页、OpenReview/aclanthology 片段） |
-| 去重规则 | 按 `dedup_key` 的假设语义做机械聚类；仅合并"同一假设"的候选，不以强弱淘汰（Phase 3 规则） |
-| 去重结果 | 42 → 38：`tts_early_exit_latency_audit_batchsync` 与 `kv-compression-output-length-inflation` 归入同一主题但假设不同，保留两条；`early-exit-x-kv-eviction` 并入前者作为子实验；`mllm_cl_benchmark_separability_audit` 与 `closed_form_router_mllm_cl` 合并为一条两阶段 idea；`verbalized_difficulty_control_knob` 与 `tts_budget_allocation_memory_knn` 合并为"TF 预算/强度分配"一条；`interpolation_three_stage_scaling_law` 并入 `merge_steer_equivalence` 作为扩展实验 |
+| Lens 子代理（v1） | ① 效率 60 篇 ② TTS 55 篇 ③ CL 70 篇 ④ 其他 64 篇；WebSearch-only |
+| 核实（v2） | 4 路子代理，`curl arxiv.org/abs/<id>`（限速 3s）+ `arxiv.org/html` grep + CrossRef；共 ~200 ID；每篇 ✅/✏️/❌/⚠ |
+| Novelty 探测（v2） | 主代理对 top-12 各做 1 次 extended WebSearch，对发现的 21 篇候选撞车论文抓 abs 核实；记录在 `idea-stage/novelty_probe_notes.md` |
+| 未能核实 | 无 arXiv ID 的 workshop/会议论文（WAVE、FLoC、HAWK、SepPrune、TagRouter、RAS、TokenDance 等）；OpenReview 单条接口被反爬拦截；abs 未写录用状态的会议归属 |
+| 去重结果 | 同 v1（42→38）；v2 另将 B11 Depth-Switch（被 2512.07580 覆盖）、B17 闭式 MLLM 路由（被 CF-Router 覆盖）标为淘汰 |
 
 ---
 
-## 2. Landscape Summary
+## 2. Landscape Summary（v2 修订处用 **[v2]** 标出）
 
 ### 2.1 LLM / MLLM 推理效率（training-free）
 
-**现状**。KV cache 侧已从"驱逐打分"走到"驱逐 × 量化 × 合并"的组合红海（KVzip [2505.23416](https://arxiv.org/abs/2505.23416)、Expected Attention [2510.00636](https://arxiv.org/abs/2510.00636)、GRKV [2605.31105](https://arxiv.org/abs/2605.31105)、SelKV、RDKV…）。真正新的是三条**诊断线**：(a) 压缩拉长输出、端到端延迟反升（MLSys'25 [2503.24000](https://arxiv.org/abs/2503.24000)、ThinKV [2510.01290](https://arxiv.org/abs/2510.01290)）；(b) 压缩的"物理"：约 90% 处出现幻觉悬崖（[2603.01426](https://arxiv.org/abs/2603.01426)），固定预算在生产中次优（Sparse Frontier [2504.17768](https://arxiv.org/abs/2504.17768)）；(c) 多指令提示下压缩会"选择性遗忘"指令（Pitfalls, ACL'26 [2510.00231](https://arxiv.org/abs/2510.00231)）。推理模型解码期 KV（R-KV/BeaconKV [2609.04971](https://arxiv.org/abs/2609.04971)/Moment-KV）揭示"重要性回流"（Thought Revisiting Tokens），推翻了 prefill 驱逐的"重要性持续"假设。
+KV cache 侧已是"驱逐 × 量化 × 合并"红海（KVzip [2505.23416](https://arxiv.org/abs/2505.23416) NeurIPS'25、Expected Attention [2510.00636](https://arxiv.org/abs/2510.00636)、GRKV [2605.31105](https://arxiv.org/abs/2605.31105) EMNLP'26、RDKV/HqeKV/CAPKV…）。真正新的是三条诊断线：(a) 压缩与生成长度的关系——**[v2]** MLSys'25 [2503.24000](https://arxiv.org/abs/2503.24000) 与 ReCo [2608.04771](https://arxiv.org/abs/2608.04771)、RLKV [2510.08525](https://arxiv.org/abs/2510.08525) 说驱逐拉长，ThinKV [2510.01290](https://arxiv.org/abs/2510.01290)（ICLR'26 Oral，html 核实）说"驱逐不拉长、纯量化最高拉长 5.1×"；(b) 压缩的"物理"：~90% 处幻觉悬崖（[2603.01426](https://arxiv.org/abs/2603.01426)），固定预算次优（Sparse Frontier [2504.17768](https://arxiv.org/abs/2504.17768)），**[v2]** Compactor [2507.08143](https://arxiv.org/abs/2507.08143) 已提出"context-calibrated compression"推断每上下文可承受的压缩率；(c) 多指令提示下压缩选择性遗忘指令（Pitfalls, ACL'26 main [2510.00231](https://arxiv.org/abs/2510.00231)）。解码期 KV（R-KV、BeaconKV [2609.04971](https://arxiv.org/abs/2609.04971) ICML'26）揭示"重要性回流"。
 
-视觉 token 剪枝在单图上饱和且被根本性质疑，但**长视频/流式**（FLoC、InfiniPot-V [2506.15745](https://arxiv.org/abs/2506.15745)、ForestPrune）、**多模态 KV**（MadaKV、FlashCache [2511.16786](https://arxiv.org/abs/2511.16786)、RetentiveKV 的"视觉重要性迟发"）、**剪枝 × PTQ 交互**（QAPruner [2604.02816](https://arxiv.org/abs/2604.02816)）刚起步。投机解码侧，MMSpec [2603.14989](https://arxiv.org/abs/2603.14989) 证明文本 SD 在 VLM 上失效（Lookahead 仅 1.07×），SparseSpec-L [2607.27735](https://arxiv.org/abs/2607.27735) 刚证明"稀疏 KV 的自己"可当 drafter。早退方面 [2603.23701](https://arxiv.org/abs/2603.23701) 指出新一代模型层冗余更低、收益逐代递减。
+视觉 token 剪枝在单图饱和且被 CVPR'26 [2512.07580](https://arxiv.org/abs/2512.07580) 根本性质疑——**[v2]** 其摘要已包含"深层随机 + 浅层 DART/DivPrune 的混合策略"，所以"按地平线切换"不再是 idea。长视频/流式、多模态 KV（MadaKV、FlashCache [2511.16786](https://arxiv.org/abs/2511.16786) CVPR'26；**[v2]** RetentiveKV [2605.04075](https://arxiv.org/abs/2605.04075) ACL'26 Findings 含可学习门控、非严格 TF）、剪枝 × PTQ（QAPruner [2604.02816](https://arxiv.org/abs/2604.02816)）刚起步。投机解码：MMSpec [2603.14989](https://arxiv.org/abs/2603.14989) 证明文本 SD 在 VLM 上失效（Lookahead 1.07×）；**[v2]** SpecVLM [2508.16201](https://arxiv.org/abs/2508.16201)（EMNLP'25 main）已证明"draft 对视频 token 剪枝不敏感"并做了 training-free SD（但用独立小 Vid-LLM 作 draft）；SparseSpec-L [2607.27735](https://arxiv.org/abs/2607.27735) 用稀疏 KV 的自己作 drafter（文本）；**[v2]** DraftExpert 实为需训练。
 
-**蓝海**：VLM 的 TF 投机解码；agent/工具调用/多轮压缩；端侧 ≤3B；驱逐打分在 W4A4 旋转量化模型上的迁移；多图交错；MLA/MoE 上的 KV 压缩；"为什么失败"的诊断。
+**蓝海（核实后仍成立）**：驱逐/量化 × 生成长度的机制；工具调用/多轮 agent 的压缩；驱逐打分在 W4A4 旋转量化模型上的迁移；MLA/MoE 上的 KV 压缩；同图多问的 query-agnostic 视觉 KV；"draft-model-free"的 VLM 自投机。
 
 ### 2.2 Test-Time Scaling（training-free）
 
-**现状**。并行采样 + 自适应 N + 置信选择（DeepConf [2508.15260](https://arxiv.org/abs/2508.15260)、CGES [2511.02603](https://arxiv.org/abs/2511.02603)、SeerSC、Parallel-Probe [2602.03845](https://arxiv.org/abs/2602.03845)、Consilience [2608.09898](https://arxiv.org/abs/2608.09898)）与单轨迹 early-exit / 反思压制（DEER [2504.15895](https://arxiv.org/abs/2504.15895)、CGRS、RPDI-EE、CoDE-Stop、ASAG [2606.15070](https://arxiv.org/abs/2606.15070)）两条线都已饱和。三个未解矛盾：(a) 置信选择在难题上有效（DeepConf AIME25 99.9%）还是崩溃（CGES 承认 GPQA 无信息；Consilience 称"灾难性失效"）；(b) verifier-free TTS 是否次优（理论说差距随预算扩大；实证 [2607.09438](https://arxiv.org/abs/2607.09438) 说 PRM beam 比 SC 低 0.39pp 贵 8×，[2608.01207](https://arxiv.org/abs/2608.01207) 说多数投票打败自验证）；(c) token 减少 ≠ 延迟减少（SpecExit/[2605.17672](https://arxiv.org/abs/2605.17672) 测出 DEER 端到端 0.52–0.71×）。
+并行采样 + 置信选择（DeepConf [2508.15260](https://arxiv.org/abs/2508.15260) ICLR'26、CGES [2511.02603](https://arxiv.org/abs/2511.02603)、SeerSC、Parallel-Probe [2602.03845](https://arxiv.org/abs/2602.03845)、Consilience [2608.09898](https://arxiv.org/abs/2608.09898)）与单轨迹 early-exit（DEER [2504.15895](https://arxiv.org/abs/2504.15895)、CGRS [2508.05337](https://arxiv.org/abs/2508.05337)、RPDI-EE、CoDE-Stop、ASAG [2606.15070](https://arxiv.org/abs/2606.15070)）饱和。**[v2]** "token ≠ 延迟"的审计论点已被 SpecExit [2509.24248](https://arxiv.org/abs/2509.24248) 与 PUMA [2605.17672](https://arxiv.org/abs/2605.17672) 发表（证明 DEER 端到端变慢），只剩"零额外前向的批同步退出"这一设计增量。**[v2]** 反思 token 调度已成小红海：CyclicReflex [2506.11077](https://arxiv.org/abs/2506.11077) ICLR'26、Reflection Steering [2608.25542](https://arxiv.org/abs/2608.25542)、ARLCP [2602.12113](https://arxiv.org/abs/2602.12113) ICLR'26、"thinking trap" [2506.23840](https://arxiv.org/abs/2506.23840)；CGRS 摘要即"当前回答高置信时压制反思"。**[v2]** "决策点"探针与 probe-based 早停已在 [2604.22266](https://arxiv.org/abs/2604.22266) 做了简单版。
 
-agent 侧 General AgentBench [2602.18998](https://arxiv.org/abs/2602.18998) 明确指出序列扩展撞"上下文天花板"、并行扩展撞"验证缺口"，两者都无实际增益；CATTS [2602.12276](https://arxiv.org/abs/2602.12276) 只做步级投票。training-free latent 推理只有 Soft Thinking 一篇且自认 OOD，**不建议投入**。轻量 TTT/TTA 中真正 TF 的只有记忆/规则类（Dynamic Cheatsheet [2504.07952](https://arxiv.org/abs/2504.07952)、TF-TTCL）。
+置信信号的失效条件：**[v2]** 新证据支持"RLVR 轴"——[2609.32470](https://arxiv.org/abs/2609.32470)（LRM 的 verbalized confidence prior 集中于少数高值并贯穿 RL）、EACL'26 "Think Just Enough"（置信控制在 RL 模型上更伤精度）、"Variation in Verification"（ICLR'26，对 verifier 做了难度 × 模型相图）。跨方法、跨置信定义的统一相图仍无。
 
-**蓝海**：置信信号的难度 × 模型（RLVR 程度）相图；early-exit 的延迟诚实性与批友好设计；轨迹级共识迁移到 agent；极低预算（N≤4）区间的策略对比；"决策点"oracle-gap 评测协议。
+agent 侧：General AgentBench [2602.18998](https://arxiv.org/abs/2602.18998) 说并行/序列扩展均无增益；**[v2]** [2604.16529](https://arxiv.org/abs/2604.16529)（2026-04）用 rollout 结构化摘要 + Recursive Tournament Voting 做事后选择（Claude-4.5-Opus SWE-bench Verified 70.9→77.6）；FailFast [2608.03222](https://arxiv.org/abs/2608.03222) 训 0.6B 监视器做单轨迹早停。在线跨轨迹共识早停仍未见。
 
 ### 2.3 Continual Learning（training-free / 少训练）
 
-**现状**。ViT-CIL 上 TF 解析式方法（RanPAC [2307.02251](https://arxiv.org/abs/2307.02251)、Fly-CL ICLR'26 [2510.16877](https://arxiv.org/abs/2510.16877)、AnaCP、LR-RGDA）持续打平训练式方法，但 AnaCP/VILA 自述"表示僵化"；没人回答**在什么域距离或泄漏比例下 TF 开始落后**（CLDyB [2503.04655](https://arxiv.org/abs/2503.04655) 与 Data Leakage [2508.17416](https://arxiv.org/abs/2508.17416) 各给了一半工具）。LLM 侧最重要的新结论是 RL's Razor [2509.04259](https://arxiv.org/abs/2509.04259)：遗忘由新任务上相对 base 的 output-KL 预测，权重量不行——而视觉合并线（MagMax、SFA、Audit Before You Merge ICML'26）全靠权重空间启发式，两者未在同一坐标系比较。
+ViT-CIL 上 TF 解析式方法（RanPAC [2307.02251](https://arxiv.org/abs/2307.02251)、Fly-CL [2510.16877](https://arxiv.org/abs/2510.16877) ICLR'26、AnaCP、LR-RGDA、VILA ICML'26）持续打平训练式方法；**[v2]** APER（IJCV）已因数据重叠提出新基准，必须引用。LLM 侧 RL's Razor [2509.04259](https://arxiv.org/abs/2509.04259)：遗忘由 output-KL 预测，权重量不行——**[v2]** 核实其已覆盖机器人基础模型，但视觉 CIL 与模型合并未覆盖；视觉合并线（MagMax、SFA **[v2]** v2 已改名 "Forget About It" 并改用 Qwen3-14B；**[v2]** Audit Before You Merge = ICML'26 CATS workshop）仍全靠权重空间启发式。
 
-记忆/检索式 CL 结论混乱：CL-Bench、ContinualSkillBench [2608.03874](https://arxiv.org/abs/2608.03874) 说朴素 ICL 赢；Chronos (ACL'26)、GraphMemory [2610.02687](https://arxiv.org/abs/2610.02687)、WikiBigEdit [2503.05683](https://arxiv.org/abs/2503.05683) 说 RAG 有过期/退化/推理成本——根源是各家"遗忘"定义不同。MLLM-CL 方法线被 ICML'26 诊断为基准任务高度可分。CTTA 与 CIL 两个社区（TTABC [2606.14299](https://arxiv.org/abs/2606.14299)、UL-TTA、PTA vs RanPAC、RAIL）在做同一件事的两种参数化，从未同台。
+记忆/检索式 CL：**[v2]** "RAG or Learning?"（ACL'26 Findings，即 v1 的 Chronos）已在同一时间戳基准对比 continual FT / 编辑 / RAG 并报告遗忘 + 时间不一致；WikiBigEdit [2503.05683](https://arxiv.org/abs/2503.05683)（ICML'25）已画 1→500K 更新的编辑/WISE/RAG/LoRA 曲线；CL-Bench [2606.05661](https://arxiv.org/abs/2606.05661)、ContinualSkillBench [2608.03874](https://arxiv.org/abs/2608.03874) 说朴素 ICL 赢。"统一遗忘定义 + 等预算"仍缺但增量变小。**[v2]** MLLM-CL 的 TF 闭式路由已被 CF-Router（ICLR'26 workshop，MLLM 末层隐藏态 + RLS 闭式分类器选 LoRA）做掉；"Is Our Benchmark Enough"为 workshop 文。CTTA 与 CIL 仍未同台（TTABC [2606.14299](https://arxiv.org/abs/2606.14299) NeurIPS'26 D&B 只有 TTA 族；**[v2]** ARC [2405.14318](https://arxiv.org/abs/2405.14318) ICLR'25 是"CL 的 test-time training"，需列为相关工作）。
 
-**蓝海**：泄漏分层协议；KL 作为跨模态遗忘预测量与合并准则；CTTA+CIL 统一；统一遗忘定义的等预算对比；更新次数 10→10,000 的退化曲线；审计后的合并排名。
+### 2.4 其他 training-free / 低资源方向（v2 修订）
 
-### 2.4 其他 training-free / 低资源方向
-
-| 方向 | 饱和度 | 要点 |
-|---|---|---|
-| 合并·Thinking/Instruct 插值可调推理 | 活跃→趋饱和 | Thinking Spectrum [2509.22034](https://arxiv.org/abs/2509.22034)、Revisiting Interpolation ACL'26 [2510.10977](https://arxiv.org/abs/2510.10977) 一致："简单插值即可调 token-精度曲线"；缺机制与规模律 |
-| 合并·异构/跨 tokenizer/理论 | 起步 | Darwin Family、AutoMerge、OMP 移植 [2506.06607](https://arxiv.org/abs/2506.06607)；综述列"theoretical gaps" |
-| Steering 可靠性 / 安全副作用 | 活跃（反面研究刚起步） | Braun [2505.22637](https://arxiv.org/abs/2505.22637)、Rogue Scalpel ICLR'26 [2509.22067](https://arxiv.org/abs/2509.22067)、Safety Pitfalls [2603.24543](https://arxiv.org/abs/2603.24543)：任意方向都抬高有害顺从率；无缓解方案，非安全用途 steering 从不报安全税 |
-| CoT 长度 steering | 活跃 | ASC [2507.04742](https://arxiv.org/abs/2507.04742)、Activation Control、STU-PID；与权重插值的关系未研究 |
-| 解码期对齐 | 活跃 | AAD ICML'26 [2509.26169](https://arxiv.org/abs/2509.26169)；仍需 DPO 对或奖励模型 |
-| TF 长上下文扩展 | 活跃 | DPE [2504.18857](https://arxiv.org/abs/2504.18857)→MrRoPE ICLR'26 oral [2601.22181](https://arxiv.org/abs/2601.22181)："逐维/混合进制"新范式；从未用于视频 MLLM |
-| Many-shot 压缩 / 函数向量 | 活跃 | MemCom [2510.16092](https://arxiv.org/abs/2510.16092)（8×，需训练压缩器）；FV "可 steer 不可解码" ICML'26；二者未交汇 |
-| TF 路由 / 级联 | 活跃 | ZeroRouter AAAI'26、VDAR [2607.18098](https://arxiv.org/abs/2607.18098)；难度估计是瓶颈 |
-| Agent TF 效率 | 起步（混乱） | 系统/博客多，学术化低；Tran & Kiela [2604.02460](https://arxiv.org/abs/2604.02460) 指出算力匹配后单 agent 不输多 agent |
-| MLLM 高分辨率 zoom | 活跃→趋饱和 | HiDe ICML'26 [2510.00054](https://arxiv.org/abs/2510.00054) 改写归因为"背景干扰" |
-| 视频 KV-as-memory | 活跃 | FlexMem CVPR'26 [2603.29252](https://arxiv.org/abs/2603.29252)、StreamMem [2508.15717](https://arxiv.org/abs/2508.15717)；位置编码从未被当变量 |
-| 多图交错 TF | 起步 | PulseFocus [2603.04676](https://arxiv.org/abs/2603.04676) 单作者 ongoing |
-| **LLM-TTS（语音）TF 加速/控制** | 起步 | EmoSteer [2508.03543](https://arxiv.org/abs/2508.03543) 只在 flow-matching 侧；TED-TTS ACL'26 [2601.03170](https://arxiv.org/abs/2601.03170) 只调 EOS logit；PCG [2511.13732](https://arxiv.org/abs/2511.13732) 语音化 SD 接受准则（仍需 draft）；AR 语义 token LM 侧 steering/对比解码/自投机空白 |
-| TF 遗忘、tokenizer 迁移、dLLM 加速 | 起步 / 起步 / 活跃（Fast-dLLM 已成基线） | — |
+| 方向 | v1 评级 | **v2 评级** | 核实后要点 |
+|---|---|---|---|
+| 合并·Thinking/Instruct 插值 | 活跃→趋饱和 | 趋饱和 | **[v2]** L2S [2503.20641](https://arxiv.org/abs/2503.20641) 已报告 1.5B–32B 规模相关性 + 按复杂度自适应长度；Revisiting v2 已补 Llama-3.1-8B |
+| 合并·理论/可预测性 | 起步 | 起步（增量变小） | **[v2]** Submodule Linearity [2504.10902](https://arxiv.org/abs/2504.10902) 摘要已含"按子模块合并 + 最优权重闭式解" |
+| Steering 安全税 | 活跃（反面研究刚起步） | **饱和（2026 H2）** | 2608.08383 COLM'26、OPIUM、2605.01167、2608.11227 |
+| CoT 长度 steering | 活跃 | 活跃 | **[v2]** STU-PID 撤回 → 改引 2510.04309（ICLR'26）；Reflection Steering 2608.25542 |
+| TF 长上下文扩展 | 活跃 | 活跃 | DPE [2504.18857](https://arxiv.org/abs/2504.18857)、MrRoPE [2601.22181](https://arxiv.org/abs/2601.22181)（录用信息 abs 未载）；**[v2]** 视频理解侧已有 INTP-Video-LLMs [2409.12963](https://arxiv.org/abs/2409.12963)（2024，TF 增帧）、GIRAFFE M-RoPE++ [2412.12735](https://arxiv.org/abs/2412.12735)（需训练）、FLEX [2602.14027](https://arxiv.org/abs/2602.14027)（视频生成，频率感知 RoPE） |
+| Many-shot 压缩 / 函数向量 | 活跃 | 活跃 | **[v2]** 2505.12075 真实标题为 "Do different prompting methods yield a common task representation…"（NeurIPS'25）；AAAI'26 "Sensitivity-Aware Task Vectors for Many-Shot Multimodal ICL" 疑似与 B21 相近（未读全文） |
+| TF 路由 / 难度估计 | 活跃 | 活跃 | **[v2]** ODAR [2602.23681](https://arxiv.org/abs/2602.23681) 已用难度估计在 Fast/Slow Agent 间路由 |
+| 视频 KV-as-memory | 活跃 | 活跃 | FlexMem 真实标题 "Scaling the Long Video Understanding of MLLMs via Visual Memory Mechanism"；**[v2]** VisCache [2608.24063](https://arxiv.org/abs/2608.24063)（2026-08，prompt-aware） |
+| 多图交错 TF | 起步 | 起步 | **[v2]** PulseFocus 已撤回，勿引 |
+| **LLM-TTS（语音）TF 控制/去幻觉** | 起步 | **活跃→趋饱和** | ECCD 2608.00722、语速 steering 2609.33810、口音 2603.05977、EmoShift 2601.22873、CoCoEmo 2602.03420；PCG 2511.13732（SD 需 draft） |
+| Agent TF 效率 | 起步 | 起步 | Tran & Kiela [2604.02460](https://arxiv.org/abs/2604.02460) 标题实为仅多跳推理 |
 
 ---
 
-## 3. 跨方向结构性 gap（去重后的六大主题）
+## 3. 跨方向结构性 gap（v2 收敛为五个主题）
 
-每条列出 lens、依据论文、为什么是 gap。
+### G1. 压缩/早停的真实代价与矛盾裁决（contradiction + diagnostic）
+- **驱逐 vs 量化谁拉长输出**：ThinKV（驱逐不拉长、量化拉长 ≤5.1×）vs ReCo/RLKV/MLSys'25（R-KV 驱逐拉长 +38.8%/+79%）。差异可能来自模型族（R1-Llama vs R1-Qwen）、压缩率、驱逐策略（R-KV 冗余去重 vs ThinKV 思维感知）、是否统计"答案出现后的尾巴"。无人裁决、无机制、无 TF 修复（ReCo 用训练式 process-reward 估计器）。
+- **early-exit 的延迟**：审计已被 SpecExit/PUMA 做；剩余是"零额外前向 + 批同步"设计。
 
-### G1. "token ≠ 延迟"：压缩与早停的真实代价（contradiction + diagnostic）
-- **效率侧**：KV 压缩/量化让生成变长、端到端延迟反升（[2503.24000](https://arxiv.org/abs/2503.24000)、ThinKV），方法论文只报 token/s；机制（结论锚点被驱逐？重复自检？）与 TF 修复空白。
-- **TTS 侧**：DEER 报 token −19~80%，SpecExit/[2605.17672](https://arxiv.org/abs/2605.17672) 测出端到端 0.52–0.71×；SeerSC 指出序列早停破坏并行；几乎所有 early-exit/选择器论文不报 wall-clock。
-- **交叉**：早停改变长度分布 → 移动 KV 驱逐最优预算，两者从未联合评测。
-- **共同缺口**：一个"延迟诚实"的评测协议 + 零额外前向的批友好设计。
+### G2. 信号失效相图（contradiction + untested-assumption）
+- 置信类 TTS 选择器：DeepConf vs CGES vs Consilience；RLVR 轴有新证据（2609.32470、EACL'26）；跨方法统一相图仍无。
+- attention 剪枝 vs 随机：2512.07580 已给混合策略，"地平线随分辨率/帧数前移"只剩视频外推（价值低）。
+- steering 向量在 MoE / ≤1.7B / 长上下文扩展后的漂移仍无数据。
 
-### G2. 信号的失效相图（contradiction + untested-assumption）
-- **置信类 TTS 选择器**：DeepConf 99.9% vs CGES "GPQA 无信息" vs Consilience "难题灾难性失效"；三者数据集/模型/置信定义不同，无人按难度桶 × 模型 × 置信定义画相图。置信早停的有效性很可能依赖 RLVR 后训练带来的校准（TTSV [2512.04748](https://arxiv.org/abs/2512.04748) Qwen +17 分、LLaMA 0 分；[2601.06423](https://arxiv.org/abs/2601.06423) SC 对 GPT-5.2 与 Claude 方向相反）。
-- **注意力类剪枝**：attention 剪枝"领先基线"（HoloV/TOPS/ERASE）vs "≥20 层后不如随机"（[2512.07580](https://arxiv.org/abs/2512.07580)）；"信息地平线"是否随分辨率/帧数/模型代际前移未测。
-- **Steering 向量**：Braun 发现 cos 一致性与可分性预测可 steer 性；steering 在 MoE、≤1.7B、长上下文扩展后是否漂移均无数据。
-- **反思 token**：NoWait/CGRS（压制派）vs s1/α1（插入派）vs underthinking（切换有害），缺"难度 × 中间答案正确性"的 2×2 分解。
+### G3. 基准有效性与遗忘预测量（diagnostic + method-transfer）
+- 预训练泄漏 ↔ TF-CL 优势（CLDyB + Data Leakage 各一半；APER 已提新基准但未量化泄漏）。
+- output-KL vs 权重空间量作为遗忘预测量：LLM 已证，视觉 CIL + 模型合并未证；可反过来作合并系数准则。
+- MLLM-CL 可分性跨基准（Is Our Benchmark Enough 仅 workshop + 仅 MLLM-CL）。
 
-### G3. 基准有效性审计（diagnostic + untested-assumption）
-- **CL**：ViT-CIL 基准上 TF 方法的胜利可能反映 ImageNet-21K/LAION 对 CIFAR/ImageNet-R/CUB 的覆盖（CLDyB + Data Leakage 各给一半工具）；MLLM-CL 任务高度可分（ICML'26），CoIN/MLLM-CTBench 是否同样可分未检验；公共 LoRA 合并的遗忘测量被 Δ≈0 伪影污染（Audit Before You Merge）。
-- **TTS**：VLM 侧 [2608.01207](https://arxiv.org/abs/2608.01207) 证明一类"一致性选择"的增益在匹配解码格式与预算后消失；LLM 侧 DeepConf/Consilience/RPDI 没有同类受控审计。
-- **效率**：视频 token 压缩从未与"均匀帧采样 + 随机空间"强基线公平对比。
-- **合并**：成败无事前预测量，只能事后评测。
-
-### G4. 方法向新 regime 的迁移（scaling-regime + method-transfer）
-- **agent / 工具调用 / 多轮**：Pitfalls (ACL'26) 证明多指令会被选择性遗忘；工具 schema + 多轮观测的 TF 压缩无人做，BFCL/τ-bench 未被用于压缩评测；agent 上并行 TTS 卡在验证缺口（General AgentBench），轨迹级共识未见；真实 agent trace 的跨上下文重叠度无实测（KV 共享类方法的前提）。
-- **多模态**：VLM 的 TF 投机解码（MMSpec 证明文本法失效 + SparseSpec-L 的"稀疏自己当 drafter"+ 视觉 token 深层可丢 = 天然 drafter，无人组合）；query-agnostic 重建式打分（KVzip）未迁移到视觉 KV；逐维 RoPE 分析（DPE/MrRoPE）未用于视频；多图交错剪枝空白。
-- **模型/硬件 regime**：端侧 ≤3B 的 TF 压缩评测几乎无；KV 驱逐打分在 W4A4 旋转量化模型上的有效性未验证（QAPruner 只证明了视觉剪枝 × PTQ 有交互）；MLA/MoE 上 KV 压缩与专家跳过的联合空白；插值三阶段只在 4B/30B-A3B 观察。
-- **CL regime**：更新次数 10→10,000 下 TF 闭式头 vs 单 LoRA 合并 vs 编辑的曲线；0.5–3B LLM 上冻结 + 闭式头的 CL；预训练数据量 → TF 优势的扫描。
+### G4. 新 regime 迁移（scaling-regime + method-transfer）
+- 工具调用 agent 的 KV 压缩（Pitfalls 只做 IFEval；BFCL/τ-bench 未用于压缩评测）。
+- 驱逐打分 × W4A4 旋转量化（QAPruner 只做了视觉剪枝 × PTQ）。
+- MLA/MoE 上 KV 驱逐 × 专家跳过。
+- 同图多问 prefix 复用的 query-agnostic 视觉 KV（StreamMem 只做流式、VisCache prompt-aware）。
+- draft-model-free 的 VLM 自投机（SpecVLM 用独立 draft）。
+- 视频 M-RoPE 的逐维有效长度（INTP-Video-LLMs 用整体插值）。
 
 ### G5. 跨社区统一（contradiction + method-transfer）
-- **CTTA vs TF-CIL**：UL-TTA/MS-TTA/PTA 与 RanPAC/RAIL 都是"原型 + 统计量更新"，CIL 本质是极端 label shift，从未在同一 CLIP 数据流对比。
-- **权重插值 vs 激活 steering**：Revisiting Interpolation（权重 α）与 ASC（激活 λ）都在调 CoT 长度，是否同一条轴未知；steering 领域的几何预测量（cos 一致性）可迁移为合并的逐层 α 选择。
-- **RAG/ICL vs 参数化 CL**：各家"遗忘"操作定义不同（能力遗忘 / 事实过期 / 暂时对齐丢失 [2501.13453](https://arxiv.org/abs/2501.13453)），缺等预算统一对比。
-- **KL-to-base vs 权重空间量**：RL's Razor 说 output-KL 预测遗忘；MagMax/SFA 的成功全是权重平均——权重平均是否恰因在 KL 上最小？未验证。
-- **难度估计**：路由（VDAR）、steering 强度（STU-PID）、zoom（LazyMCoT）、TTS 预算（SeerSC）各自估难度，无统一 TF 旋钮。
-
-### G6. 语音 LLM-TTS 的 AR LM 侧（method-transfer）
-- CosyVoice2 等的 LM 阶段与文本 LLM 同构，但 TF 控制只碰了 flow-matching（EmoSteer）与 EOS logit（TED-TTS）；CoT 长度 steering → 语速/停顿/强调、注意力级对比解码 → 跳字/重复、层跳/早退式自投机 → 替代需训练的 draft（SSD/PCG），均空白；也缺"控制强度 × SIM × WER × 延迟"的联合评测。
+- CTTA（UL-TTA/MS-TTA/PTA）vs TF-CIL（RanPAC/RAIL）同一 CLIP 流。
+- 权重插值 vs 激活 steering 的同轴性（L2S 已报规模相关，但 steer-merge 几何未做）。
+- 统一遗忘定义的 ICL/RAG/LoRA/编辑对比（"RAG or Learning?" 做了一半）。
 
 ---
 
-## 4. Recommended Ideas（ranked）
+## 4. Recommended Ideas（v2 重排，每条含"重审后的定位"）
 
-排序依据：gap 的证据强度 × 结果无论正负都有价值 × 单卡/API 可完成 × 与 2026 顶会已发表工作的区分度。Novelty 为同家族自评（provisional）。
+每条新增四个重审字段：**已被发表的部分** / **我们的 delta** / **48 小时 pilot** / **Kill criteria**。Novelty 为核实后的同家族自评。
 
-### Idea 1：Why Compression Makes Models Talk Longer —— KV 压缩导致生成膨胀的归因与 TF 修复
-- **Method（我们实际做什么）**：(1) 在 R1-Distill-Qwen-7B / Qwen3-8B 上跑 SnapKV、R-KV、KIVI-2bit、Expected Attention，逐样本记录生成长度、重复 n-gram 率、"答案出现后继续生成的 token 数"；(2) 用 token 级归因（删哪些 KV 导致膨胀）判定是"结论/计划锚点被驱逐"还是"自检循环"；(3) TF 修复：给答案候选/结论标记及邻域 KV 加保护位，并用重复熵触发 budget forcing 提前收尾；(4) 以端到端延迟（不是 token/s）汇报，并附早停 × 驱逐的联合 Pareto 面（原 Idea "Early-Stop × KV-Evict" 作为子实验）。
-- **Hypothesis**：长度膨胀主要源于早期锚点被驱逐引发的重复自检；保护 <2% 的锚点 KV 可消除 >70% 的膨胀。
-- **Minimum experiment**：AIME24/25、MATH500、LiveCodeBench 子集、LongBench 生成类；指标 准确率 / 平均长度 / 端到端延迟 / 峰值显存；单卡 A100-80G 约 40–60 GPU-h。
-- **Expected outcome**：成功 = 归因定位到可解释的锚点类型 + 修复后延迟回到或低于无压缩；失败 = 膨胀与被驱逐 token 类型无关（则转为"压缩改变停止行为"的负结果诊断，仍可发）。
-- **Novelty 7/10** — closest：[2503.24000](https://arxiv.org/abs/2503.24000)（发现现象未解释）、ThinKV [2510.01290](https://arxiv.org/abs/2510.01290)（量化拉长未归因）、BeaconKV（重访 token，目标是精度）。
-- **Feasibility**：公开权重 + KVPress 库即可；无训练。
-- **Risk**：MEDIUM。**Contribution type**：diagnostic + method。
-- **Pilot result**：SKIPPED（本环境无 GPU）。
-- **Reviewer's likely objection**：锚点保护可能等价于"保留首尾 token"技巧；现象是否在非推理模型上存在。
-- **Why we should do this**：命中 G1 的核心矛盾，是整个压缩子方向都需要却没人做的事；正负结果都有价值。
+### Idea 1：Eviction or Quantization — Who Makes Reasoning Models Talk Longer?（v1 Idea 1 重定位）
+- **已被发表的部分**：现象本身（MLSys'25 [2503.24000](https://arxiv.org/abs/2503.24000)；ReCo [2608.04771](https://arxiv.org/abs/2608.04771) 给出 R-KV +38.8%/+79%；RLKV v3）；训练式修复（ReCo 的 process-reward 三组件）；ThinKV 的反向结论（驱逐不拉长、量化拉长）。
+- **我们的 delta**：(1) 裁决矛盾——在同一模型族 × 同一压缩率网格 × 同一长度统计口径下复现 ThinKV 与 ReCo，定位分歧来自模型族、驱逐策略还是"答案后尾巴"的统计口径；(2) 机制——token 级归因：被驱逐/被量化的是"结论锚点"还是"重复检测"所需的 KV，用 Global Eviction Ratio 与 logit 轨迹回答；(3) TF 修复——锚点 KV 保护 + 重复熵触发收尾，与 ReCo（训练式）同台，报端到端延迟。
+- **Method**：R1-Distill-Qwen-7B、R1-Distill-Llama-8B、Qwen3-8B × {SnapKV, R-KV, BeaconKV, KIVI-2bit, ThinKV 量化} × 压缩率 {25%, 50%, 75%}；逐样本记录总长度、答案首次出现位置、答案后 token 数、重复 n-gram 率。
+- **Hypothesis**：长度膨胀在驱逐与量化下都存在但机制不同——驱逐丢"结论锚点"导致重复自检，量化抬高熵导致更多反思 token；ThinKV 的"驱逐不拉长"只在其思维感知驱逐 + 特定模型上成立。保护 <2% 锚点 KV 可消除驱逐侧 >70% 的膨胀。
+- **48 小时 pilot**：单模型 R1-Distill-Qwen-7B，MATH-500 200 题，R-KV 25% vs KIVI-2bit vs 无压缩，三项长度指标 + 准确率；~8 GPU-h。若 R-KV 不复现 ReCo 的 +38.8%，即进入"口径差异"分析。
+- **Kill criteria**：若两种压缩的长度膨胀都 <10% 且与 ReCo 不一致，说明现象依赖实现细节，转为 negative/replication 短文。
+- **Minimum experiment**：AIME24/25、MATH-500、LiveCodeBench 子集；单卡 80G 约 40–60 GPU-h。
+- **Novelty 6/10 | Risk MEDIUM | Contribution：diagnostic + method**。
+- **Reviewer's likely objection**："ReCo 已修复"——答：ReCo 需训练 reward 估计器且未解释机制；"锚点保护 = 保留首尾 token"——需与 StreamingLLM 式 sink 保护对照。
 - dedup_key：`kv-compression-output-length-inflation-anchor-protection`
 
-### Idea 2：Steering Safety-Tax Audit + Refusal-Orthogonal Fix —— 非安全用途 steering 的安全税与 TF 修复
-- **Method**：(1) 复现 Rogue Scalpel 协议（HarmBench/AdvBench 有害顺从率）；(2) 对五类非安全用途 steering（ASC CoT 压缩、COLD-Steer 行为、DPS 个性化、指令函数向量、MLLMEraser 式擦除）逐一测安全税；(3) 用对比法估计 refusal 子空间（1–3 维），把任意 steering 向量投影到其正交补再施加；(4) 报告"目标效果保留率 vs 安全税消除率"。
-- **Hypothesis**：安全税主要来自 steering 向量在 refusal 方向上的非零投影；正交化可消除 >80% 安全税而目标效果损失 <10%。
-- **Minimum experiment**：Llama-3.1-8B-Instruct、Qwen2.5-7B-Instruct；HarmBench 子集 + 各 steering 原任务集；单卡约 15 GPU-h。
-- **Expected outcome**：成功 = 正交化显著降税且保效果；失败 = 随机方向也有税（Rogue Scalpel 暗示非方向性因素），则结论为"steering 的安全税不可由线性修复消除"，仍是重要负结果。
-- **Novelty 7/10** — closest：Rogue Scalpel [2509.22067](https://arxiv.org/abs/2509.22067)、Safety Pitfalls [2603.24543](https://arxiv.org/abs/2603.24543)（只诊断不修）。
-- **Feasibility**：最轻量的一条，纯推理。
-- **Risk**：MEDIUM。**Contribution type**：diagnostic + defense。
-- **Pilot result**：SKIPPED。
-- **Objection**：正交化会削弱 steering 本身；refusal 子空间可能非线性。
-- **Why**：steering 正被当作"免训练万能旋钮"推广（CoT 压缩、个性化、擦除），而三篇 2025–26 论文证明它有安全税且无人修——时间窗口正好。
-- dedup_key：`steering_safety_tax_refusal_orthogonal`
-
-### Idea 3：ConfMap —— 置信选择的"难度 × 模型 × 置信定义"失效相图
-- **Method**：(1) 固定三种置信定义（DeepConf bottom-10% group conf、CGES 答案后验、Consilience 时间曲线）；(2) MATH-500 / AIME24-25 / GPQA-Diamond / LiveCodeBench 按 pass@1 分 5 个难度桶；(3) 每桶算置信-正确 AUROC、oracle 选择 vs 置信选择 vs 多数投票差距；(4) 加入 RLVR 轴：同一基座的 base / SFT / RLVR 检查点（原 Idea "RLVR-Calibration Dependence" 并入）；(5) 产出一条简单切换规则。
-- **Hypothesis**：置信选择的增益集中在 pass@1 ∈ [0.2, 0.7] 的中等难度桶；最难桶 AUROC → 0.5 并被多数投票反超；RLVR 更重的模型相图整体右移。
-- **Minimum experiment**：Qwen3-4B/8B、R1-Distill-7B、GPT-OSS-20B；N=32，约 80K 条轨迹，vLLM 单卡 40–60 GPU-h。
-- **Expected outcome**：一张可操作相图 + 对三篇顶会矛盾的统一解释。
-- **Novelty 6/10** — closest：DeepConf、CGES（Thm 3.5 承认失效但未画相图）、Consilience、TTSV（观察到 Qwen/LLaMA 差异未解释）。
-- **Feasibility**：纯采样 + 离线分析，可用 API。
-- **Risk**：LOW。**Contribution type**：diagnostic + rule。
-- **Pilot result**：SKIPPED。
-- **Objection**："benchmark 分析不是方法"；难度桶由 pass@1 定义与置信相关。
-- **Why**：子方向已饱和到审稿人对新信号疲劳，但"什么时候信号失效"没人回答；低风险、高引用潜力。
-- dedup_key：`tts_confidence_difficulty_phase_map`
-
-### Idea 4：PruneDraft —— 用"剪掉视觉 token 的自己"做 VLM 的无训练无损自投机
-- **Method**：(1) 草拟阶段用深层视觉 token 剪枝（保留 10–20%）+ 浅层早退的同一模型生成 k 个 token；(2) 验证阶段用全 KV 并行校验（标准 SD，无损）；(3) ViSkip 式视觉相关性门控 + SparseSpec-L 式熵控制器自适应 k；(4) 在 MMSpec 六类任务上报 wall-time speedup 与 p99。
-- **Hypothesis**：视觉 token 占 VLM KV >80% 且深层信息"消失"，剪枝版自草拟接受率 >0.8，整体 1.6–2.2×，优于 Lookahead (1.07×)。
-- **Minimum experiment**：Qwen2.5-VL-7B、LLaVA-1.5-7B；MMSpec + Video-MME 短答；单卡 48–80G 约 30 GPU-h。
-- **Expected outcome**：成功 = 接受率与加速比达标；失败 = 草拟仍需全层使上限受限（则缩为"视觉剪枝作为 drafter 的接受率分析"）。
-- **Novelty 7/10** — closest：SparseSpec-L [2607.27735](https://arxiv.org/abs/2607.27735)（文本）、MMSpec/ViSkip（门控不草拟）、LayerSkip（需训练）。
-- **Risk**：MEDIUM。**Contribution type**：method。
-- **Pilot result**：SKIPPED。
-- **Objection**：与 EAGLE 类训练 drafter 相比速度可能不占优。
-- **Why**：三条已发表结论（MMSpec 失效、SparseSpec-L 可行、深层视觉 token 可丢）拼起来就是它，窗口期短。
-- dedup_key：`visual-token-pruned-self-speculative-decoding-vlm`
-
-### Idea 5：DPE-for-Video —— 视频 MLLM 的逐维位置重映射（不驱逐也能看更多帧）
-- **Method**：(1) 在 Qwen2.5-VL-7B / LLaVA-OneVision-7B 上，用 DPE 的注意力贡献度量分别对 M-RoPE 的时间/空间维度估计"有效长度"；(2) 只重映射关键时间维度，把可用帧从 ~64 扩到 ≥512，不做 KV 驱逐；(3) 与 FlexMem/StreamMem 比较并测"重映射 + 轻度压缩"的叠加；(4) 对比视频与文本的关键维度分布。
-- **Hypothesis**：视频时间维度"训练不足"的维度比例高于文本，DPE 式重映射收益更大且与 KV 压缩正交。
-- **Minimum experiment**：Video-MME、LongVideoBench、MLVU；单卡 3090/4090 约 30 GPU-h。
-- **Novelty 7/10** — closest：DPE [2504.18857](https://arxiv.org/abs/2504.18857)、MrRoPE（文本）；FlexMem、StreamMem（压缩不改位置）。
-- **Risk**：MEDIUM（M-RoPE 多维结构使估计不直接；基准对帧数饱和）。**Contribution type**：method-transfer + analysis。
-- **Pilot result**：SKIPPED。
-- **Objection**：收益可能被更简单的帧采样抵消——必须与均匀/自适应采样基线比。
-- **Why**：视频记忆工作全把位置当常量，这是 G4 中最干净的一次"A 域成熟方法 → B 域未试"。
-- dedup_key：`dimensionwise_rope_video_mllm`
-
-### Idea 6：Reflect-or-Not —— 反思 token 何时有用的 2×2 因果分解
-- **Method**：(1) 在每个 "Wait" 处强制补全得到中间答案；(2) 标注该反思为有益/有害/冗余；(3) 按"难度 × 中间答案正确性"做 2×2 统计；(4) 得到条件压制规则（仅在"中间答案已对且熵低"时压制），与 NoWait/CGRS/α1 比。
-- **Hypothesis**：反思只在"中间答案错 + 中难题"象限净有益；条件压制同时超过 NoWait 的节省与 α1 的精度。
-- **Minimum experiment**：R1-Distill-7B、Qwen3-8B；MATH-500/AIME/GPQA；单卡约 20 GPU-h。
-- **Novelty 7/10** — closest：NoWait [2506.08343](https://arxiv.org/abs/2506.08343)、CGRS、α1、underthinking [2501.18585](https://arxiv.org/abs/2501.18585)。
-- **Risk**：MEDIUM（CGRS 已部分做"熵高才允许反思"）。**Contribution type**：analysis + method。
-- **Objection**："CGRS 的增量"——要靠 2×2 发现本身撑起。
-- dedup_key：`tts_reflection_token_value_decomposition`
-
-### Idea 7：Leakage-Stratified CL —— 预训练泄漏能解释多少 training-free 方法的优势？
-- **Method**：(1) 用 CLIP/DINO 特征对 ImageNet-21K 与 LAION 子集做近重复检索（复用 Data Leakage 的 hard/soft 定义），给 CIFAR-100 / ImageNet-R / CUB / Cars / ObjectNet / 2025 后新数据的每个类打"泄漏分"；(2) 同一 ViT-B/16 上跑 RanPAC、Fly-CL、SimpleCIL（TF）与 CODA-Prompt、SD-LoRA、EWC-LoRA（训练式）；(3) 按泄漏分分层报告 TF−trained 差距；(4) 构造"零泄漏"子集作为新协议。
-- **Hypothesis**：TF 优势随泄漏分单调增加；零泄漏层训练式方法反超 ≥3 pts。
-- **Minimum experiment**：约 30–40 单卡小时。
-- **Novelty 7/10** — closest：CLDyB [2503.04655](https://arxiv.org/abs/2503.04655)、Data Leakage [2508.17416](https://arxiv.org/abs/2508.17416)、PAM [2603.21170](https://arxiv.org/abs/2603.21170)——各做一半。
-- **Risk**：MEDIUM（泄漏分与域相似度混淆，需 DINO 域距离做协变量）。**Contribution type**：diagnostic + protocol。
-- **Objection**：近重复阈值任意；泄漏 ≠ 记忆。
-- dedup_key：`cl_leakage_stratified_tf_vs_trained`
-
-### Idea 8：KL-Razor for Vision & Merging —— output-KL 是否也是 PTM-CL / 模型合并的遗忘预测量
-- **Method**：(1) ViT/CLIP 的 CIL + MTIL 上跑 8 种方法（CODA、SD-LoRA、EWC-LoRA、SLAO、MagMax、SFA、TA、全微调）；(2) 每步记录新任务 KL-to-base、Δ-norm、稀疏度、梯度秩、intruder-dimension 数；(3) 回归实测遗忘；(4) 把 KL 作为 MagMax/SFA 的合并系数准则做干预。
-- **Hypothesis**：KL 在视觉上同样是最强预测量（r>0.8，权重量 r<0.5）；KL 选系数比固定系数遗忘 ↓20%。
-- **Minimum experiment**：ViT-B/16；ImageNet-R 10 任务 + MTIL；约 40–60 单卡小时。
-- **Novelty 7/10** — closest：RL's Razor [2509.04259](https://arxiv.org/abs/2509.04259)（仅 LLM、RL vs SFT）、MagMax、LoRA intruder dims (NeurIPS'25)。
-- **Risk**：MEDIUM（class-incremental 下输出头变化使 KL 定义需用特征空间/logit 子集）。**Contribution type**：diagnostic + criterion。
-- **Objection**："KL 与性能循环定义"——用新任务 KL 预测旧任务遗忘规避。
+### Idea 2：KL-Razor for Vision & Merging（v1 Idea 8 升至第 2）
+- **已被发表的部分**：RL's Razor [2509.04259](https://arxiv.org/abs/2509.04259)（NeurIPS'25）在 LLM 与机器人 FM 上证明 output-KL 预测遗忘、权重量不行；[2605.26097](https://arxiv.org/abs/2605.26097) 说 replay 数据上约束 KL 更防遗忘（LLM）；LoRA intruder dims [2410.21228](https://arxiv.org/abs/2410.21228) 已做缩放奇异值的干预。
+- **我们的 delta**：(1) 跨模态验证——ViT/CLIP 的 CIL 与 MTIL 上 8 种方法（CODA、SD-LoRA、EWC-LoRA、SLAO、MagMax、SFA、TA、全微调）的 KL / Δ-norm / 稀疏度 / 梯度秩 / intruder 数 → 实测遗忘的回归；(2) **把 KL 变成合并系数准则**——MagMax/SFA/TA 的系数由"新任务 KL-to-base 最小"选择，这是 RL's Razor 没做的干预实验；(3) 顺带回答 G5 的问题：权重平均之所以有效是否因为它在 KL 上近似最小。
+- **Hypothesis**：视觉上 KL 的 r>0.8，权重量 r<0.5；KL 选系数比固定系数遗忘 ↓20%。
+- **48 小时 pilot**：ViT-B/16 ImageNet-R 10 任务，仅 3 种方法（全微调、SD-LoRA、MagMax），记录 KL 与遗忘，看相关是否 >0.7；~6 GPU-h。
+- **Kill criteria**：pilot 相关 <0.4 且权重量更好 → 结论反转也值得发（"RL's Razor 不跨模态"），但方法部分放弃。
+- **Minimum experiment**：约 40–60 单卡小时。
+- **Novelty 7/10 | Risk MEDIUM | Contribution：diagnostic + criterion**。
+- **Objection**："class-incremental 下输出头在变，KL 怎么定义"——用特征空间 KL 或共享 logit 子集；"KL 与性能循环定义"——用新任务 KL 预测旧任务遗忘。
 - dedup_key：`kl_forgetting_predictor_vision_merging`
 
-### Idea 9：One Stream, Two Communities —— CTTA 与 TF-CIL 在同一 CLIP 数据流上的统一
-- **Method**：(1) 构造 CLIP 数据流：ImageNet-C 渐变 corruption × 类增量到达 × 标签偏移；(2) 跑 CTTA 侧 UL-TTA、MS-TTA、PTA、TPS 与 CL 侧 RanPAC、RAIL、Continual-CLIP；(3) 把两族都写成"原型 + 统计量更新"统一式，差异仅在更新规则；(4) 提出混合更新规则。
-- **Hypothesis**：两族各自崩在对方擅长的维度；统一"原型 + 协方差 + 先验"闭式更新同时拿到两边 ≥90% 的最优值。
-- **Minimum experiment**：CLIP ViT-B/16；全 TF，<15 单卡小时。
-- **Novelty 7/10** — closest：TTABC [2606.14299](https://arxiv.org/abs/2606.14299)（只有 TTA 族）、BayesTTA、RAIL。
-- **Risk**：LOW。**Contribution type**：diagnostic + unified framework。
-- **Objection**："两个社区问题定义不同对比不公平"——需多种流配置。
+### Idea 3：Leakage-Stratified CL（v1 Idea 7 升至第 3）
+- **已被发表的部分**：CLDyB [2503.04655](https://arxiv.org/abs/2503.04655) 提出污染可能；Data Leakage [2508.17416](https://arxiv.org/abs/2508.17416) 量化 ImageNet/LAION 泄漏但不涉及 CL 方法；APER（IJCV）因重叠提出新基准但未分层分析；PAM [2603.21170](https://arxiv.org/abs/2603.21170) 指出基线缺失。
+- **我们的 delta**：首次把"每类泄漏分"与"TF vs 训练式方法差距"交叉；给出零泄漏协议。
+- **Hypothesis**：TF 优势随泄漏分单调增加；零泄漏层训练式方法反超 ≥3 pts。
+- **48 小时 pilot**：只做 ImageNet-R + CUB，RanPAC vs CODA-Prompt，用 CLIP 特征对 ImageNet-21K 子集做近重复检索；~8 GPU-h。
+- **Kill criteria**：泄漏分与差距的 Spearman <0.2 且 DINO 域距离解释力更强 → 改为"域距离分层"叙事。
+- **Minimum experiment**：6 数据集 × 6 方法，约 30–40 单卡小时。
+- **Novelty 7/10 | Risk MEDIUM | Contribution：diagnostic + protocol**。
+- **Objection**：近重复阈值任意；泄漏 ≠ 记忆——报多阈值敏感性 + 用 membership-inference 式指标佐证。
+- dedup_key：`cl_leakage_stratified_tf_vs_trained`
+
+### Idea 4：ConfMap（v1 Idea 3，加 RLVR 轴）
+- **已被发表的部分**：Consilience 声称置信在难题上失效；CGES v2 有校准/区分度分析；"Variation in Verification"（ICLR'26）对 verifier 做了难度 × 模型相图；[2609.32470](https://arxiv.org/abs/2609.32470) 说 LRM 置信 prior 集中；EACL'26 "Think Just Enough" 说置信控制在 RL 模型上更伤精度。
+- **我们的 delta**：跨三种置信定义（DeepConf bottom-10% group conf / CGES 后验 / Consilience 时间曲线）× pass@1 难度桶 × 同一基座不同后训练检查点（base/SFT/RLVR）的统一相图 + 一条切换规则；这是 "Variation in Verification" 对 verifier 做过而对 verifier-free 选择器没做的事。
+- **Hypothesis**：增益集中在 pass@1 ∈ [0.2, 0.7]；最难桶 AUROC → 0.5 并被多数投票反超；RLVR 更重的模型相图右移。
+- **48 小时 pilot**：Qwen3-8B，MATH-500 N=16，三种置信定义的 AUROC 按桶；API 或 ~6 GPU-h。
+- **Kill criteria**：三种定义在所有桶上 AUROC 都 >0.75 → "置信总是有效"，相图无意义；转去验证 Consilience 的"灾难性失效"是否可复现。
+- **Minimum experiment**：Qwen3-4B/8B、R1-Distill-7B、GPT-OSS-20B；N=32；40–60 GPU-h。
+- **Novelty 6/10 | Risk LOW | Contribution：diagnostic + rule**。
+- **Objection**："benchmark 分析不是方法"；难度桶与置信相关——用独立模型的 pass@1 定义难度。
+- dedup_key：`tts_confidence_difficulty_phase_map`
+
+### Idea 5：One Stream, Two Communities（v1 Idea 9）
+- **已被发表的部分**：TTABC（NeurIPS'26 D&B）统一了 TTA 族；BayesTTA 指出渐变偏移；ARC [2405.14318](https://arxiv.org/abs/2405.14318)（ICLR'25）做了"CL 的 test-time training"；RLAP-CLIP（ICLR'26）原型 CIL。
+- **我们的 delta**：CTTA 方法（UL-TTA、MS-TTA、PTA、TPS）与 TF-CIL 方法（RanPAC、RAIL、Continual-CLIP）首次放进同一 CLIP 流（渐变 corruption × 类增量 × label shift），写成"原型 + 统计量更新"统一式，给混合规则。
+- **Hypothesis**：两族各崩在对方擅长的维度；统一闭式更新拿到两边 ≥90%。
+- **48 小时 pilot**：CLIP ViT-B/16，CIFAR-100-C 流（5 种 corruption × 10 任务），UL-TTA vs RanPAC；全 TF，~3 GPU-h。
+- **Kill criteria**：任一方法在混合流上已同时接近两边最优 → 统一框架无增益，缩为 benchmark 短文。
+- **Minimum experiment**：<15 单卡小时。
+- **Novelty 6/10 | Risk LOW | Contribution：diagnostic + unified framework**。
+- **Objection**："两个社区定义不同对比不公平"——多种流配置 + 报告每族在本族设定下的原始数字。
 - dedup_key：`ctta_cil_unified_clip_stream`
 
-### Idea 10：Trajectory-Consensus Probe —— 把 Parallel-Probe 的跨分支共识搬到多步 agent
-- **Method**：(1) 并行 K 条 agent 轨迹；(2) 每 T 步对各轨迹"状态摘要"（页面/文件/工具调用序列哈希 + 自述子目标）聚类；(3) 共识簇占比超阈值即停其余分支、把算力转给共识簇；(4) 与 CATTS（步级）、均匀 best-of-K、AggAgent 比。
-- **Hypothesis**：轨迹级共识早停能恢复 agent 上并行扩展的增益（General AgentBench 说目前没有），且比均匀 K 省 ≥40% token。
-- **Minimum experiment**：WebArena-Lite 或 SWE-bench Verified 50 题；Qwen3-32B 或 API；K=8；约 $100 API 或 40 GPU-h。
-- **Novelty 7/10** — closest：Parallel-Probe [2602.03845](https://arxiv.org/abs/2602.03845)、CATTS [2602.12276](https://arxiv.org/abs/2602.12276)、AggAgent [2604.11753](https://arxiv.org/abs/2604.11753)。
-- **Risk**：HIGH（状态摘要难对齐；agent 评测噪声大）。**Contribution type**：method-transfer。
-- **Objection**："agent 轨迹不可比较，共识定义模糊"。
-- dedup_key：`tts_agent_trajectory_consensus_probe`
-
-### Idea 11：ReconVis —— 一次压缩多问复用的 query-agnostic 视觉 KV 驱逐
-- **Method**：(1) 图像/视频 prefill 后，用 MLLM 自身以"描述这张图"为 pseudo-query 做一次重建前向，取重建注意力作为视觉 KV 的 query-agnostic 重要性（KVzip 迁移）；(2) 低分视觉 KV 做 GRKV 式岭回归合并而非丢弃，保留"迟发重要性"通道；(3) 压缩 cache 作为 prefix 被同图多问复用；(4) 对比 query-aware 剪枝在多问设置的退化。
-- **Hypothesis**：同图多问下，20% 视觉 KV 预算时比 VisionZip/SparseVLM 高 ≥5 点并允许 prefix 命中。
-- **Minimum experiment**：Qwen2.5-VL-7B、LLaVA-OneVision-7B；MMBench/SEED 同图多问重组、VisDial、Video-MME 多问子集；约 30 GPU-h。
-- **Novelty 7/10** — closest：KVzip [2505.23416](https://arxiv.org/abs/2505.23416)、RetentiveKV (ACL'26)、FlashCache。
-- **Risk**：MEDIUM。**Contribution type**：method。
-- **Objection**：重建前向多一次 prefill；多问基准是重组而非原生。
+### Idea 6：ReconVis（v1 Idea 11）
+- **已被发表的部分**：KVzip（文本重建式打分）；StreamMem [2508.15717](https://arxiv.org/abs/2508.15717)（流式视频 query-agnostic）；VisCache [2608.24063](https://arxiv.org/abs/2608.24063)（prompt-aware）；FlashCache（attention-free 但无多问评测）。
+- **我们的 delta**："同图/同视频多问 + prefix 复用"设定下的 query-agnostic 视觉 KV 打分（重建式）+ 低分 KV 岭回归合并保留迟发重要性；报告 prefix 命中率与多问退化曲线。
+- **48 小时 pilot**：Qwen2.5-VL-7B，MMBench 同图多问重组 300 组，VisionZip vs 重建式打分 @20% 预算；~5 GPU-h。
+- **Kill criteria**：query-aware 方法在多问设定下退化 <2 pts → 问题不存在。
+- **Novelty 6/10 | Risk MEDIUM | 约 30 GPU-h**。
+- **Objection**：重建前向多一次 prefill；多问基准是重组——补 VisDial / Video-MME 原生多问。
 - dedup_key：`query-agnostic-visual-kv-reconstruction-multiquery`
 
-### Idea 12：AR Speech-LM Prosody Steering + Attention-Contrastive Decoding —— LLM-TTS 的 LM 侧 training-free 控制与去幻觉
-- **Method**（两条可拆分的子线）：(a) 在 CosyVoice2-0.5B 的 LM 隐状态上按 ASC 法抽"快→慢""平→强调"向量，按 token 段施加（复用 TED-TTS 的 segment 思路），评 WER/SIM/时长误差/UTMOS；(b) 定位文本-语音对齐注意力头，按 ACD/LayerCake 思路构造"受损"前向做对比解码治跳字/重复，在 Seed-TTS-eval hard 集测 WER 插入/删除率。
-- **Hypothesis**：语义 token LM 内存在与文本"CoT 长度方向"同构的"时长方向"；跳字/重复对应对齐头注意力崩塌，注意力对比可在不伤 SIM 下把 hard 集 WER 降 15–30%。
-- **Minimum experiment**：CosyVoice2-0.5B（开源）；Seed-TTS-eval zh/en + LibriTTS；每条子线单卡 10–12 GPU-h。
-- **Novelty 7/10** — closest：EmoSteer [2508.03543](https://arxiv.org/abs/2508.03543)（flow-matching 侧）、TED-TTS [2601.03170](https://arxiv.org/abs/2601.03170)（logit/embedding）、ACD (ICML'26, VLM)、Selective CFG [2509.19668](https://arxiv.org/abs/2509.19668)。
-- **Risk**：MEDIUM（时长可能主要编码在声学/flow 阶段；跳字可能来自 tokenizer）。**Contribution type**：method-transfer。
-- **Objection**：与 CosyVoice 指令模式 / CFG / 重复惩罚相比优势何在——需对比并展示互补。
-- dedup_key：`ar_speech_lm_prosody_steering` + `tts_attention_contrastive_decoding_hallucination`
+### Idea 7：PruneDraft — Draft-Model-Free Self-Speculation for VLMs（v1 Idea 4 降级重定位）
+- **已被发表的部分**：SpecVLM [2508.16201](https://arxiv.org/abs/2508.16201)（EMNLP'25 main）：draft 对视频 token 剪枝不敏感、两阶段剪枝 draft 的视频 token、2.68×/2.11×——但用独立小 Vid-LLM 作 draft；SparseSpec-L 用稀疏 KV 的自己作 drafter（文本）；MMSpec 证明文本 SD 失效。
+- **我们的 delta**：无独立 draft 模型——同一 VLM 深层视觉 token 剪枝 + 浅层早退作 draft，全 KV 验证；面向图像与短视频（SpecVLM 只做视频）；在 MMSpec 六类任务上与 SpecVLM、Lookahead 同台，报 wall-time 与 p99。
+- **Hypothesis**：接受率 >0.8，1.5–2.0×，无需任何 draft 模型。
+- **48 小时 pilot**：Qwen2.5-VL-7B，MMSpec 子集，测"剪 80% 视觉 token 的自己"对全模型的 top-1 一致率（接受率代理）；~4 GPU-h。
+- **Kill criteria**：一致率 <0.6 → 自草拟上限不足，放弃。
+- **Novelty 5/10 | Risk MEDIUM | 约 30 GPU-h**。
+- **Objection**："SpecVLM 的增量"——必须证明去掉 draft 模型后加速比不降且部署更简单。
+- dedup_key：`visual-token-pruned-self-speculative-decoding-vlm`
+
+### Idea 8：DPE-for-Video（v1 Idea 5 降级）
+- **已被发表的部分**：INTP-Video-LLMs [2409.12963](https://arxiv.org/abs/2409.12963)（TF 增帧：token 重排 + 上下文扩展）；GIRAFFE M-RoPE++（需训练）；FLEX [2602.14027](https://arxiv.org/abs/2602.14027)（视频生成的频率感知 RoPE 调制）；DPE/MrRoPE（文本逐维）。
+- **我们的 delta**：对 M-RoPE 的时间维度做 DPE 式"逐维有效长度"估计并只重映射关键维度，与 KV 压缩（FlexMem/StreamMem）正交叠加；与 INTP-Video-LLMs 的整体插值和 FLEX 的频率分组同台。
+- **48 小时 pilot**：Qwen2.5-VL-7B，Video-MME 短/中子集，64→256 帧，DPE 式 vs 均匀采样 vs INTP 式；~6 GPU-h。
+- **Kill criteria**：256 帧下三者差距 <1 pt → 基准对帧数饱和，换 LongVideoBench 再试一次仍无差距则放弃。
+- **Novelty 5/10 | Risk MEDIUM | 约 30 GPU-h**。
+- dedup_key：`dimensionwise_rope_video_mllm`
+
+### Idea 9：ToolKV（backlog B8 升级）
+- **已被发表的部分**：Pitfalls（ACL'26 main，IFEval 上多指令被选择性遗忘）；ST-Lite（GUI agent）；UltraQuant（EMNLP'26 Industry，4-bit KV，仅量化）。
+- **我们的 delta**：首个工具调用 agent 的 KV 压缩基准（BFCL、τ-bench、多轮 SWE 轨迹）+ 段类型（system / tool schema / observation）驱逐诊断 + 段感知预算（schema 冻结、observation 激进）。
+- **48 小时 pilot**：Qwen2.5-7B-Instruct，BFCL 多轮子集 200 条，SnapKV 50% 预算下工具调用合法率；~3 GPU-h。
+- **Kill criteria**：50% 预算下合法率下降 <5 pts → agent 轨迹还不需要压缩，放弃。
+- **Novelty 6/10 | Risk LOW | 约 30 GPU-h | Contribution：benchmark + method**。
+- dedup_key：`tool-calling-agent-kv-compression-segment-aware-budget`
+
+### Idea 10：Rotation-Aware KV Eviction（backlog B7 升级）
+- **已被发表的部分**：QAPruner [2604.02816](https://arxiv.org/abs/2604.02816)（视觉剪枝 × PTQ 有交互）；QUOTA [2604.17320](https://arxiv.org/abs/2604.17320)（FlatQuant 扩到 VLM，无驱逐）；RDKV/HqeKV（KV 量化 × 驱逐，权重 FP16）。
+- **我们的 delta**：首次系统评测权重旋转量化（QuaRot/SpinQuant/OptRot W4A4）与 KV 驱逐打分（SnapKV/K-Norm/Expected Attention/FlashCache 式）的交互；若失效，在旋转空间重估 query 分布的闭式修正。
+- **48 小时 pilot**：Llama-3.1-8B QuaRot W4A4 公开权重，LongBench 子集，SnapKV 与 K-Norm 的打分排序与 FP16 版本的 Spearman；~4 GPU-h。
+- **Kill criteria**：所有打分 Spearman >0.9 且精度差 <0.5 → 无交互，写 1 页负结果附在其他工作里。
+- **Novelty 6/10 | Risk LOW | 约 25 GPU-h | Contribution：diagnostic + fix**。
+- dedup_key：`kv-eviction-under-rotation-quantization`
 
 ---
 
-## 5. Backlog：其余候选（按主题，均通过去重，未进 top-12）
+## 5. Backlog（v2 重评；★ = 核实后仍无覆盖）
 
-| # | Idea | 主题 | Novelty | Risk | GPU-h | 一句话 |
-|---|---|---|---|---|---|---|
-| B1 | Latency-Honest Early Exit（批同步、零额外前向的退出 + 延迟审计） | G1 | 6 | LOW | 30 | 复现 DEER/RPDI/CoDE-Stop/ASAG 报四项延迟指标，设计批友好变体；Idea 1 的 TTS 侧孪生 |
-| B2 | Oracle-Gap 评测协议（"决策点"作 early-exit 上界） | G1/G3 | 5 | LOW | 25 | 用 [2604.22266](https://arxiv.org/abs/2604.22266) 的强制补全定义 oracle 退出点，报 premature rate / overshoot |
-| B3 | Matched-Control Audit for LLM TTS Selectors | G3 | 5 | MED | 40 | 把 [2608.01207](https://arxiv.org/abs/2608.01207) 的受控审计搬到 DeepConf/Consilience/RPDI/ST-BoN |
-| B4 | Low-Budget Regime Study（N≤4、≤8K token 下哪种 TF 策略最优） | G4 | 5 | LOW | 30 | NoThinking×N vs 单条长 thinking+early exit vs 短 CoT+自纠正，compute-matched |
-| B5 | Cross-Trajectory Hidden-State Convergence 作全局停止信号 | G1 | 6 | MED | 20 | ST-BoN 扩展：隐状态收敛先于答案收敛，零生成成本 |
-| B6 | TF 预算/强度统一旋钮（Budget-from-Memory kNN + 口头化难度画像） | G5 | 5–6 | MED | 20 | 近邻记忆给 N 先验；VDAR 式难度画像控制插值 α / steering 强度 / zoom |
-| B7 | Rotation-Aware KV Eviction（驱逐打分在 W4A4 旋转量化模型上的失效与修复） | G4 | 6 | LOW | 25 | 首次系统评测权重旋转量化 × KV 驱逐交互 |
-| B8 | ToolKV（工具调用 agent 的压缩基准 + 段感知预算） | G4 | 6 | LOW | 30 | BFCL/τ-bench 下 schema 段冻结 + observation 段激进压缩 |
-| B9 | CliffGuard（每请求自适应压缩率，控制在幻觉悬崖之下） | G1/G4 | 6 | MED | 40 | 用 Global Eviction Ratio / 头一致性熵做在线代理 |
-| B10 | MoE-KV（MLA/MoE 上 KV 驱逐 × 专家跳过联合） | G4 | 6 | MED | 40 | Qwen3-30B-A3B / DeepSeek-V2-Lite；驱逐 token 与跳过专家是否同一批 |
-| B11 | Depth-Switch Pruning（按"信息地平线"切换注意力剪枝/均匀剪枝） | G2 | 5 | LOW | 20 | 工作坊级；检验地平线随分辨率/帧数前移 |
-| B12 | Video Token Pruning Random-Baseline Audit | G3 | 5 | LOW | 25 | 视频侧的 [2512.07580](https://arxiv.org/abs/2512.07580)；负结果风险 |
-| B13 | Unified Forgetting Ledger（ICL/RAG/LoRA-CL/编辑/sparse-memory 的三维遗忘 + 等预算） | G5 | 7 | HIGH | 45 | 价值高但工作量大，需裁剪到 2 域 |
-| B14 | Audited LoRA Merging Benchmark（审计前后 TIES/DARE/TA 排名） | G3 | 5 | MED | 25 | 扩展 Audit Before You Merge 到合并算法比较 |
-| B15 | Decomposing the Gain（训练式 PTM-CL 增益 = 分类头 + 特征适配 + 调参） | G3 | 6 | MED | 30 | 逐方法消融；分解不唯一 |
-| B16 | Update-Count Scaling（10→10,000 次更新下 TF 闭式头 vs 单 LoRA 合并 vs 编辑） | G4 | 6 | MED | 50 | 视觉几乎 TF，语言 ~40h |
-| B17 | MLLM-CL 可分性跨基准审计 + 闭式去相关路由（两阶段） | G3/G5 | 5–6 | MED | 30 | 先证 CoIN/MLLM-CTBench 是否同样可分，再用 Fly-CL 式路由替代 MR-LoRA |
-| B18 | Pretraining-Scale Sweep（预训练数据量 → TF-CL 优势） | G4 | 6 | MED | 60 | 骨干不可控是主要风险 |
-| B19 | Merge-vs-Steer 等价性（插值 α 与 steering λ 是否同一条轴；含规模/MoE 外推） | G5 | 6 | MED | 25–40 | 若 cos 关系平凡则只是经验表 |
-| B20 | Merge Predictability（steering 几何指标 → 逐层 α 选择） | G3/G5 | 6 | MED | 20 | 零搜索开销是卖点 |
-| B21 | Head-Aware Many-Shot Compression（函数向量替代均匀逐层压缩） | G5 | 6 | MED | 12 | FV 在生成式任务上弱 |
-| B22 | Agent-Trace KV-Overlap Measurement（KV 共享收益上界） | G4 | 5 | LOW | 0–5 | 纯 CPU 分析，analysis paper |
-| B23 | Steering under Context Extension（向量在 DPE/MrRoPE 扩展后的漂移与重校准） | G2 | 6 | LOW | 15 | 无漂移亦可作 finding |
-| B24 | Cross-Tokenizer Training-free Merge（OMP 移植 + 异构块合并） | G4 | 6 | HIGH | 15 | 合适模型对太少 |
-| B25 | Early-Stop × KV-Evict 联合 Pareto | G1 | 4 | LOW | 20 | 已并入 Idea 1 作子实验 |
-| B26 | 插值三阶段规模律 | G4 | 5 | LOW | 15–40 | 已并入 B19 |
+| # | Idea | 主题 | v1→v2 Novelty | 核实发现 |
+|---|---|---|---|---|
+| B1 | Reflect-or-Not（反思 token 2×2 分解）| G2 | 7→5 | CGRS 摘要即"高置信时压制反思"；C6 已用强制补全；CyclicReflex/Reflection Steering/ARLCP 挤满。只剩 2×2 因果分解 + 插入/压制统一比较 |
+| B2 | Trajectory-Consensus Probe for Agents | G4 | 7→6, HIGH | 2604.16529 的 rollout 摘要 + RTV（事后）、FailFast（单轨迹）；在线跨轨迹共识仍无；可直接复用 2604.16529 的摘要表示 |
+| B3 | Latency-Honest Early Exit（批同步零前向） | G1 | 6→5 | 审计论点已被 SpecExit/PUMA 发表；只剩设计 |
+| B4 | ★ MoE-KV（MLA/MoE 上驱逐 × 专家跳过） | G4 | 6 | 无覆盖 |
+| B5 | CliffGuard（每请求自适应压缩率） | G1 | 6→5 | Compactor 已有 context-calibrated compression |
+| B6 | Matched-Control Audit for LLM TTS Selectors | G2 | 5 | 无直接覆盖，但负结果风险 |
+| B7 | Oracle-Gap 评测协议 | G2 | 5→4 | C6 已做 probe-based 早停；只剩协议 |
+| B8 | Low-Budget Regime Study（N≤4） | G4 | 5→4 | NoThinking 已做低预算 compute-matched |
+| B9 | Cross-Trajectory Hidden-State Convergence | G1 | 6→4 | ST-BoN 摘要即内部状态一致性早停 |
+| B10 | TF 预算/强度统一旋钮（kNN 记忆 + 口头化难度） | G5 | 6→5 | PETS、Blend-ASC（ICML'26）更强基线；ODAR 已做难度→预算路由；"记忆/近邻"部分未覆盖 |
+| B11 | ★ Unified Forgetting Ledger | G5 | 7→5 | "RAG or Learning?"（ACL'26 Findings）与 WikiBigEdit 已做一半；只剩三类遗忘定义 + 等 FLOPs |
+| B12 | Audited LoRA Merging Benchmark | G3 | 5 | Audit Before You Merge 为 workshop 文，扩展空间仍在；2511.21437 (TMLR'26) 结论"只有 TA 可靠" |
+| B13 | Decomposing the Gain（PTM-CL 增益分解） | G3 | 6→5 | 2410.21228 已做 intruder 奇异值干预 |
+| B14 | ★ Update-Count Scaling（10→10,000 次更新） | G4 | 6 | 语言侧 WikiBigEdit 已画 1→500K；视觉侧无 |
+| B15 | MLLM-CL 可分性跨基准审计 | G3 | 5–6→4 | 闭式路由部分被 CF-Router 覆盖；只剩跨基准审计 + 困难版 |
+| B16 | ★ Pretraining-Scale Sweep for TF-CL | G4 | 6 | 无覆盖 |
+| B17 | Merge-vs-Steer 等价性 | G5 | 6→5 | L2S 已报规模相关；steer-merge 几何仍无 |
+| B18 | Merge Predictability（激活几何 → 逐层 α） | G3 | 6→5 | Submodule Linearity 已有闭式最优权重；收窄为"事前可预测性 + 激活 vs 权重指标" |
+| B19 | Head-Aware Many-Shot Compression | G5 | 6→5 ⚠ | AAAI'26 "Sensitivity-Aware Task Vectors for Many-Shot Multimodal ICL" 疑似相近，需读全文 |
+| B20 | ★ Agent-Trace KV-Overlap Measurement | G4 | 5 | 无覆盖；0–5 GPU-h |
+| B21 | ★ Steering under Context Extension | G2 | 6 | 无覆盖 |
+| B22 | Cross-Tokenizer TF Merge | G4 | 6 | Darwin Family 的跨架构 Mapper 应作对照 |
+| B23 | Video Token Pruning Random-Baseline Audit | G2 | 5 | 无覆盖；负结果风险 |
+| B24 | 跨应用 steering 安全税审计（TTS/MLLM 擦除/CoT 压缩） | G2 | 7→3 | v1 Idea 2 残余；修复已被做，审计价值有限 |
 
 ---
 
-## 6. Eliminated / 不建议投入
+## 6. Eliminated（v2 新增 4 条，附证据）
 
-| 方向或 idea | 原因 |
+| Idea | 淘汰原因 |
 |---|---|
-| Training-free latent / soft reasoning | 唯一 TF 方案 Soft Thinking [2505.15778](https://arxiv.org/abs/2505.15778) 自认 concept token OOD、长链崩溃，根本解需要训练 |
-| 又一个 KV 驱逐打分 / 又一个视觉 token 剪枝打分 / 又一个旋转 PTQ | 红海；且 [2512.07580](https://arxiv.org/abs/2512.07580) 已证深层不如随机 |
-| 又一个置信/熵早停信号 | 2025-08 至 2026-06 ≥15 篇；审稿人疲劳 |
-| 又一个 ViT prompt-pool CIL 方法 / 又一个 MLLM 持续指令微调 LoRA 路由 | 被 TF 基线打平；基准被诊断无效 |
-| 终身知识编辑（ROME/MEMIT 系）的新正则 | WikiBigEdit 已宣判"250 次内趋零、不如持续 LoRA" |
-| Activation steering 的新方向估计法（在 CAA/BiPO 小基准比点数） | 饱和；且可靠性/安全税问题未解，应先做 Idea 2 |
-| 文本 DoLa 系对比解码变体 | LayerCake 撤回；视觉侧更活跃 |
-| 多 agent 协调的 TF 调度 | Tran & Kiela 显示算力匹配后单 agent 不输；先做 B22 测前提 |
+| v1 Idea 2 Steering Safety-Tax + Refusal-Orthogonal Fix | 2608.08383（COLM'26）、OPIUM 2607.19806、2605.01167、2608.11227 已做缓解；Safety Pitfalls 已测正交投影只减 15–25% |
+| v1 Idea 12(a) AR Speech-LM Prosody Steering | 2609.33810（SLT'26）在 CosyVoice2 上用单 block 激活 clamp 控语速，Seed-TTS-Eval |
+| v1 Idea 12(b) TTS Attention-Contrastive Decoding | ECCD 2608.00722（CosyVoice2/3、Llasa、GLM-TTS，WER −55.6%）；attention-constrained inference 已是其基线 |
+| v1 B11 Depth-Switch Pruning | 2512.07580 摘要已含"浅层 DART/DivPrune + 深层随机"混合策略 |
+| v1 B17 闭式 MLLM 路由 | CF-Router（ICLR'26 WS）已是 MLLM 隐藏态 + RLS 闭式分类器选 LoRA |
+| 以及 v1 §6 的全部条目（training-free latent、又一个驱逐/剪枝/旋转/早停信号/prompt-pool/知识编辑正则/steering 方向估计/文本 DoLa 变体/多 agent 调度） | 同 v1 |
 
 ---
 
-## 7. Suggested Execution Order
+## 7. Suggested Execution Order（v2）
 
-1. **Idea 2（Steering 安全税）或 Idea 3（ConfMap）先行**：两者最轻（15 / 40 GPU-h 或 API）、风险最低、正负结果都能发，且都对应"顶会结论互相矛盾"的 gap。
-2. **Idea 1（压缩拉长输出）**：效率方向的旗舰；若归因成功可直接带出 TF 修复方法。
-3. **Idea 4（PruneDraft）与 Idea 5（DPE-for-Video）**：多模态方向两条方法迁移，窗口期短，建议 1–2 个月内出 pilot。
-4. **CL 三条（Idea 7/8/9）**：Idea 9 全 TF 最便宜，可作为 CL 方向的第一篇；Idea 7/8 更像"改写社区共识"的诊断论文。
-5. **Idea 6 / 10 / 11 / 12**：按团队背景选；Idea 12 需要语音栈。
+1. **先跑 48 小时 pilot 的三条低成本诊断**：Idea 5（全 TF，3 GPU-h）、Idea 10（4 GPU-h）、Idea 9（3 GPU-h）。三者 kill criteria 清晰，一天内知道哪条值得投入。
+2. **主线 A（效率）**：Idea 1 的 pilot（8 GPU-h）先验证 ReCo 的 +38.8% 能否复现；复现 → 全量；不复现 → "口径差异"本身就是论文的一半。
+3. **主线 B（CL）**：Idea 2 与 Idea 3 共用 ViT-B/16 + ImageNet-R 的特征抽取，可合并 pilot（~10 GPU-h）；两者结论相互印证（泄漏高 → TF 强；KL 预测遗忘）。
+4. **主线 C（TTS）**：Idea 4 可全部用 API 做，适合没有 GPU 的时段。
+5. Idea 6/7/8（多模态三条）窗口期短、撞车风险中等，建议各做 pilot 后只保留一条。
 
 ---
 
 ## 8. Next Steps
 
-- [ ] 在可访问 arXiv 的环境重跑 `tools/arxiv_fetch.py` / `verify_papers.py`，核实四份 lens 报告中标 `⚠` / `[片段]` / `[未核实-记忆]` 的条目（尤其 RetentiveKV、ViSkip 是否 TF；LU-KV/MixedDimKV 的 profiling 需求；InfLoRA/SimpleCIL/ZSCL 的 ID；AdaBeam/GEPA 数字）。
-- [ ] 对 top-5 运行 `/novelty-check`（重点查 2026-07 之后的 arXiv，这是本次搜索最薄弱的窗口）。
-- [ ] 运行 `/research-review — reviewer: codex — difficulty: hard` 补上缺失的跨模型 jury，把 `acceptance_status` 从 provisional 升级。
-- [ ] 为选中的 1–2 条调用 `/research-refine-pipeline` 生成 `FINAL_PROPOSAL.md` 与 `EXPERIMENT_PLAN.md`；pilot 按 PILOT_MAX_HOURS=2 先跑最小版本（Idea 2 的单模型 HarmBench 子集；Idea 3 的单模型 MATH-500 N=16）。
-- [ ] 补搜本次未覆盖的：ACL/CVPR 2026 主会 CL 论文、OPCM/MINGLE 持续合并、Parametric RAG、MemoryLLM/Cartridges、CTTA@NeurIPS'25、2026-07 后的 KV 压缩与 TTS 新作。
+- [x] 用 abs 页核实四份 lens 报告（v2 完成；S2/OpenAlex 层仍 429 未跑）
+- [x] 对 top-12 做 novelty 探测并重排（v2 完成）
+- [ ] 在能访问 arXiv API 的环境重跑 `tools/verify_papers.py`，补 S2 层；核实 §1 中未逐篇核实的 ~45 篇非 closest-work 论文（CL）与无 arXiv ID 的 workshop 论文
+- [ ] 读全文划界：AAAI'26 "Sensitivity-Aware Task Vectors"（B19）、"Variation in Verification"（Idea 4）、CF-Router 与 Audit Before You Merge 正文（OpenReview 被拦截）
+- [ ] `/research-review — reviewer: codex — difficulty: hard` 补跨模型 jury；把 `acceptance_status` 从 provisional 升级
+- [ ] 对 Idea 1/2/3 调 `/research-refine-pipeline` 出 `FINAL_PROPOSAL.md` + `EXPERIMENT_PLAN.md`；pilot 先跑 §4 各条的 48 小时版本
+- [ ] 补搜 2026-09 之后的新作（本次 novelty 探测最薄弱的窗口是 2026-09~10）
 
 ---
 
-## 附：Lens 报告索引
+## 附：文件索引
 
 | 文件 | 内容 |
 |---|---|
-| `idea-stage/lens/lens_efficiency.md` | 60 篇效率论文卡片（8 个子方向表）、饱和度、5 lens × 2–5 gap、10 idea |
-| `idea-stage/lens/lens_tts.md` | 55 篇 TTS 论文卡片（8 个子方向）、饱和度表、5 lens × 2–3 gap、10 idea |
-| `idea-stage/lens/lens_cl.md` | 70 篇 CL 论文卡片（8 个子方向）、饱和度表、5 lens × 2–4 gap、10 idea |
-| `idea-stage/lens/lens_other.md` | 64 篇其他方向卡片（9 个方向）、饱和度表、5 lens × 4 gap、12 idea |
+| `idea-stage/IDEA_REPORT.md` | 本文件（v2） |
+| `idea-stage/IDEA_REPORT_2026-10-17.md` | v1（核实前） |
+| `idea-stage/novelty_probe_notes.md` | 主代理对 top-12 的 novelty 探测记录（21 篇新论文 abs 核实） |
+| `idea-stage/lens/lens_efficiency.md` | 效率 lens（含 §0.5 核实记录，37 篇） |
+| `idea-stage/lens/lens_tts.md` | TTS lens（含 §0.5 核实记录，41+12 篇） |
+| `idea-stage/lens/lens_cl.md` | CL lens（含 §0.5 核实记录，~45 条） |
+| `idea-stage/lens/lens_other.md` | 其他方向 lens（含 §0.5 核实记录，85 ID） |
