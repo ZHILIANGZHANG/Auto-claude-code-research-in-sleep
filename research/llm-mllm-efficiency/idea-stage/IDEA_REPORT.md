@@ -268,3 +268,84 @@ Also seen: s1 2501.19393, TALE 2412.18547, Chain of Draft 2502.18600, LC-R1 2506
 
 **Saturation.** Overcrowded: length-penalty RL on small math models; think-or-not routing; training-free early exit; dLLM caching tricks; EAGLE-style drafter tweaks. Under-explored: CoT compression × SD × batching; wall-clock-grounded benchmarks; SD for RL rollouts under drift; length control for dLLMs; calibration after RL compression.
 
+
+---
+
+<a id="ranked-ideas"></a>
+## Ranked Ideas
+
+**Ideas evaluated**: 18 个原始候选（3 个 lens 分片 × 6）→ 机械去重得 13 个 → 13 个全部通过客观可行性筛选 → 独立 triage 排序 → 前 3 名做深度新颖性检查 → 0 个跑了 pilot（无 GPU）。
+完整候选及标注见 [`candidate_pool.md`](candidate_pool.md)。
+
+> **Triage 的评审身份**：triage 由一个上下文全新的 Claude 子代理完成（魔鬼代言人，看不到生成过程，另做了 12 次检索）。它**不是** ARIS 要求的跨模型家族评审（Codex 不可用）。下面的排序应视为 provisional，需要等 GPT 类评审确认。
+
+### Triage 排序（N = 新颖性，I = 信息价值，F = 可行性，各 1–10）
+
+| # | ID | 题目 | N | I | F | 一句话理由 |
+|---|---|---|---|---|---|---|
+| 1 | C1(+C5) | 压缩后的 CoT 的"可投机性税"，以及随机驱逐免费午餐的消失 | 8 | 9 | 9 | 直接挑战领域的头条指标（token 数）；正反结果都有用；几天的推理就能出结果 |
+| 2 | C4 | 混合架构（linear + softmax）中少量 softmax 层的 KV 驱逐 | 8 | 8 | 6 | 真正部署的架构上的空白 regime；出现断崖就能给出部署规则 |
+| 3 | C2 | Thinking MLLM 对视觉 token 剪枝的惩罚更大 | 7 | 8 | 7 | 少见的匹配对照（Instruct/Thinking）；会重置推理 MLLM 剪枝的评测方式 |
+| 4 | C3 | MoE 专家剪枝 vs 合并 = pass@1 vs pass@k 之争 | 7 | 8 | 6 | 能平息 REAP vs REAM 的争论（前提是校准数据不是真正原因） |
+| 5 | C9 | PTQ 会把 RL 学到的增量量化掉 | 5 | 8 | 9 | 框架部分被抢先，但 pilot 几乎零成本，部署答案很明确 |
+| 6 | C5 | （并入 C1）压缩让随机驱逐不再免费 | 6 | 6 | 8 | 方向可以预判；作为 C1 的第二个维度更强 |
+| 7 | C12 | 自我转写：多轮对话下与查询无关的视觉 KV 压缩 | 6 | 7 | 7 | 多轮诊断很有价值；方法本身是 KVzip / StreamMem 的迁移 |
+| 8 | C8 | 重要性平稳性能预测"打分何时胜过随机" | 6 | 7 | 7 | 野心大的统一解释；与层深 / information horizon 混杂 |
+| 9 | C7 | 随机抽样 headroom：任何选择器最多能赚多少 | 6 | 7 | 9 | 便宜；但 best-of-R 测的是方差，不是上限 |
+| 10 | C10 | 用 drafter 的 surprisal 当 KV 驱逐信号 | 7 | 5 | 7 | 最可能的结果是"打平随机"，而这已被别人声称过 |
+| 11 | C11 | 视觉 grounded token 一致率作为剪枝评测指标 | 6 | 6 | 8 | 接近 VIG 的打分；可能只是复现 hard subset 的结论 |
+| 12 | C6 | 分叉 token 的 KL 能预测 TTS 损伤 | 5 | 6 | 8 | 在 2606.00206 之后剩下的空间很薄；约 10 个点上算 ρ |
+| 13 | C13 | 量化 × KV 驱逐的长度中介叠加效应 | 4 | 5 | 8 | 大部分已被 2510.10964 和 ThinKV 做过 |
+
+**合并建议**（triage 提出，已采纳）：C1 + C5 合为一篇（同一批模型对、同一批 trace、同一个冗余度统计量）；C7 + C8 可合为一篇关于随机基线问题的诊断论文（备选）。
+
+### 🥇 Idea 1: C1+C5 — "压缩吃掉了冗余"：CoT 长度压缩对投机解码与 KV 驱逐的隐性代价
+- **Method（我们实际做什么）**:
+  1. 选公开的"冗长 / 压缩"推理模型对，必须是真正的父子关系：R1-Distill-Qwen-1.5B → ThinkPrune-1.5B；DeepScaleR-1.5B → L1-1.5B；R1-Distill-7B → AdaptThink-7B / LC-R1-7B。
+  2. 在同一批 MATH-500 / AIME 题目上生成 trace，用 teacher forcing 离线测投机解码的接受长度 τ。drafter 用三种：无模型的 n-gram / 后缀查找、固定的小 drafter、EAGLE-3。再用压缩后的 trace 重新蒸馏 drafter，把"drafter 分布偏移"和"可预测 token 本身被删掉"这两个原因分开。
+  3. 在 vLLM 里测 batch=1 和真实 serving batch 下每道题的 wall-clock，算"有效压缩比" = wall-clock 比 / token 比。
+  4. 在同一批 trace 上比较随机驱逐（保护 prompt）、R-KV 和 SnapKV，把"随机 vs 打分"的差距对 trace 冗余度（n-gram 复述率）做回归。
+- **Hypothesis**: 长度惩罚 RL 删掉的主要是低熵、高可投机、高冗余的填充内容，所以开 SD 时 token 节省会高估 wall-clock 节省，而且随机驱逐在压缩后的 trace 上不再"免费"。
+- **Minimum experiment**: R1-Distill-1.5B vs ThinkPrune-1.5B，200 道 MATH-500，离线 n-gram τ + vLLM SD，约 1 GPU-h。
+- **Kill criterion（triage 给出）**: 在两边都答对的题上，teacher-forced τ 的相对下降 < 10%。
+- **Risk**: MEDIUM。具名风险：(a) drafter 偏移解释了全部下降，结论退化成"重训 drafter 就好"；(b) serving batch 下 SD 本来就收益有限；(c) 父模型配对必须正确。
+- **Contribution type**: empirical + diagnostic
+- **Pilot**: SKIPPED（无 GPU）
+
+### 🥈 Idea 2: C4 — 混合架构的 softmax 层需要不同的 KV 驱逐策略
+- **Method**:
+  1. 选尺寸匹配的混合 / 稠密模型对：Nemotron-H-8B vs Llama-3.1-8B / Qwen3-8B、Falcon-H1-7B、Mamba-in-the-Llama 蒸馏模型 vs 其父模型。
+  2. 只对 softmax 层的 KV 施加相同的驱逐策略（sink+window、SnapKV、随机、Ada-KV / PyramidKV 预算），预算 5–50%。
+  3. 在 RULER（NIAH、multi-key、variable tracking）和 LongBench 上测 8K–128K。
+  4. 逐层统计 recency mass（最近 512 token 上的注意力占比）和注意力熵。
+- **Hypothesis**: 混合架构里的 softmax 层专职检索，所以窗口类驱逐会断崖式失效，打分类驱逐每字节保留的质量比稠密模型更高，稠密模型的层预算形状是错的。另一种可能是 SSM 已经承担了局部上下文，驱逐几乎免费。
+- **Pilot 说服条件（triage 给出）**: (1) 相同相对预算下，混合模型上窗口驱逐比稠密模型多掉 ≥ 20 分，而 SnapKV 的差距小得多；(2) 混合模型 softmax 层的 recency mass 不到稠密模型中位数的一半；(3) 128K 时 softmax 层的 KV 每条序列仍有数 GB。
+- **Risk**: MEDIUM–HIGH。具名风险："KV 本来就小，何必驱逐"；混合与稠密模型的训练数据不同（混杂因素）；cache hook 的工程量。
+- **Contribution type**: empirical + diagnostic
+- **Pilot**: SKIPPED（无 GPU）
+
+### 🥉 Idea 3: C2 — Thinking MLLM 对视觉 token 剪枝更脆弱，且脆弱程度随思考长度增长
+- **Method**:
+  1. 用 Qwen3-VL-{2,4,8}B 的 Instruct / Thinking 匹配对。
+  2. 在 prefill 时一次性剪枝（随机、FastV、DART、下采样），保留 50/25/11%。
+  3. 在 MathVista、MathVerse-vision-only、ChartQA、MMMU 和一个简单 VQA 对照集上测，只统计全 token 时两个模型都答对的题。
+  4. 记录每个解码步对视觉 token 的注意力，算"晚期证据率"；在 Thinking 模型内部扫思考预算 1K / 4K / 16K。
+- **Hypothesis**: 相同保留率下，Thinking 模型的相对精度损失是 Instruct 的 2–3 倍，损失集中在长 trace 的后段回看。另一种可能是更长的思考补偿了缺失的视觉 token（test-time compute 替代视觉 token），这同样值得发表。
+- **Kill criterion**: 25% 保留时 Thinking / Instruct 的相对损失比 < 1.3 且置信区间重叠，同时思考预算曲线是平的。
+- **Risk**: MEDIUM。具名风险：两者的后训练差异不止 trace 长度。用 Thinking 模型内部的预算扫描来回应这个风险，不加模块。
+- **Contribution type**: empirical + diagnostic
+- **Pilot**: SKIPPED（无 GPU）
+
+### 备选：C3（MoE 剪枝 vs 合并 pass@k）、C9（PTQ 是否抹掉 RL 增量，约 1.5 GPU-h，可当 side pilot）
+
+<a id="eliminated-ideas"></a>
+## Eliminated / Deprioritized Ideas
+
+| Idea | 原因 |
+|---|---|
+| C13 量化 × KV 驱逐叠加 | 大部分已被 "Not All Bits Are Equal" 2510.10964（ICLR'26，1700+ 组 GPTQ × R-KV 配置）和 ThinKV 2510.01290 覆盖；只剩形式化的中介分析 |
+| C6 Fork-token KL 预测器 | 2606.00206 已报告量化 KL 集中在高熵 token；跨家族预测只在约 10 个点上，统计上脆弱 |
+| C11 grounded-token 一致率 | grounded 判定与 VIG 2608.21883 的打分几乎相同；可能只复现 hard subset 排名 |
+| C10 drafter surprisal 驱逐 | 最可能的结果是"打平随机"，而 Random Attention 2609.03430 已有此结论 |
+| C5 | 并入 C1，不再单独成文 |
+| C7、C8、C12 | 没有淘汰，保留为候选（C7 + C8 可合并成诊断论文） |
