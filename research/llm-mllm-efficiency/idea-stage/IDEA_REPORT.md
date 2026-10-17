@@ -11,17 +11,19 @@
 > - 没有 GPU，Phase 5 pilot 全部 **SKIPPED: needs GPU**。
 
 ## Executive Summary
-<!--EXEC-->
+**最佳 idea**：**C1+C5 "压缩吃掉冗余"**。检验长度惩罚 RL（ThinkPrune / L1 / AdaptThink / LC-R1）是否删掉了投机解码和 KV 驱逐赖以生效的冗余：在投机解码下，token 数压缩是否高估了 wall-clock 节省？随机驱逐在压缩后的 trace 上是否不再免费？新颖性 7/10（PROCEED），独立评审给 PROCEED（模拟分 5→6/10）。完全基于公开 checkpoint 做推理，第一个闸门实验只需约 1.5 GPU-h，正反结果都能发表。**备选**：C2，检验 Thinking MLLM 是否对 prefill 视觉 token 剪枝更脆弱（6/10，PROCEED）。**淘汰**：C4（混合架构 KV 驱逐），模型上下文长度不够、收益小，且已被同期工作占据。**下一步**：在有 GPU 的环境中跑 C1 的 P0 判别实验（位置匹配 + 固定窗口的 n-gram τ）；同时配置 Codex 跨模型评审，补齐 ARIS 的 acceptance receipt（本次评审都是同家族 Claude，evidence gate 为 BLOCKED，见文末）。
 
 <a id="literature-landscape"></a>
 ## Literature Landscape
 
+4 个 WebSearch 文献分片，共约 160 次查询，带链接的论文约 150 篇：1.A MLLM token 效率、1.B KV cache 与长上下文、1.C 量化 / 剪枝 / MoE、1.D 解码加速与高效推理。下面先给跨方向综合，再列各分片的论文表、空白和饱和度判断。所有数字均为摘要中的声称值，状态为 UNVERIFIED。
+
 ### 0. 跨方向综合（四个分片共同指向的结构性规律）
 
-1. **"随机基线"危机遍布各子方向。** 视觉 token 剪枝里，random/pooling/下采样常常打平或胜过精心设计的打分（2502.11501, VTC-Bench 2510.07143, UniPruneBench 2511.02650, Worse-than-Random 2512.07580）。KV 驱逐里，对推理轨迹做随机驱逐约等于最强的 evictor（Random Attention 2609.03430）。共同原因是：主流 benchmark 分不开方法，而且冗余度高的场景里，"选哪些"远不如"留多少"重要。**方法论缺口**：一个能预测"打分何时比随机有用"的 regime 理论或诊断。
+1. **"随机基线"危机遍布各子方向。** 视觉 token 剪枝里，random/pooling/下采样常常打平或胜过精心设计的打分（2502.11501, VTC-Bench 2510.07143, UniPruneBench 2511.02650, Worse-than-Random 2512.07580）。KV 驱逐里，对推理轨迹做随机驱逐约等于最强的 evictor（Random Attention 2609.03430）。*[评审修正]* 两个子方向给出的原因不同。视觉 token 方面，主要归因于 benchmark 区分度不足和位置偏差；decode KV 方面，Random Attention 归因于"保护 prompt + 逐头冗余 + 模型会复述它仍需要的内容"。所谓"统一的 regime 理论"目前只是假设，不是已有发现。**方法论缺口**：一个能预测"打分何时比随机有用"的诊断。
 2. **decode-heavy 的长推理 regime 正在打破 prefill 时代的效率假设。** 量化后的推理模型想得更久（2606.00206），剪枝会让 TTS 崩掉（2510.22228），剪枝后的模型输出更长（2509.12464），视觉相关性在解码中途会漂移（DSTP 2604.12358），CoT SFT 会抹掉混合架构的长程召回（Attention Amnesia 2606.11052）。大多数方法是在输入重建 / prefill 上校准的。
 3. **组合效应几乎没人测。** CoT 压缩 × 投机解码、量化 × token 剪枝（QAPruner 2604.02816 是唯一的警告）、MLA 转换 × 量化 × 驱逐、量化 × 剪枝 × 激活稀疏：各自的论文都声称"正交"，没人检验误差是加性、超加性还是相互抵消。
-4. **代价核算单位不对。** FLOPs、token 数、压缩率被当作代理指标；但真实部署中，验证开销、batching、prefix caching、FlashAttention 兼容性、显存访问才决定 wall-clock（Kinetics 2506.05333, SD Performance-or-Illusion 2601.11580, FlashVLM 2512.20561, 2607.05399）。"cost per solved problem"（bits × tokens × latency）没人报。
+4. **代价核算单位不对。** FLOPs、token 数、压缩率被当作代理指标；但真实部署中，验证开销、batching、prefix caching、FlashAttention 兼容性、显存访问才决定 wall-clock（Kinetics 2506.05333, SD Performance-or-Illusion 2601.11580, FlashVLM 2512.20561, 2607.05399）。把 bits × tokens × latency 合在一起的"cost per solved problem"仍然少见。*[评审修正：原先写"没人报"，说得太强。Kinetics 和 OckBench 已经报告了基于代价的效率；而且 Kinetics 的"注意力 / 显存读取主导代价"会**反向**影响 C1 的头条结论：trace 变短本身会让每个 token 更便宜。]*
 5. **后训练会改变效率相关的性质。** RL / CoT SFT 会改变量化敏感度、置信度校准（early exit 依赖它）、长程注意力（稀疏/混合架构依赖它），以及可投机性（drafter 依赖它）。这些影响几乎都没被测量过。
 
 **过度拥挤（避免）**：又一个 LLaVA-1.5 上的无训练视觉 token 打分准则；离线视频 token 合并；W4A4 rotation 在 LLaMA PPL 上抠小数点；长度惩罚 RL 用在 R1-Distill-1.5B 数学上；attention-score KV 驱逐在 LongBench 上刷分；dLLM 缓存小技巧；EAGLE 式 drafter 微调。
@@ -130,7 +132,7 @@ Also seen: reasoning eviction ForesightKV 2602.03203, KV-Rescue 2608.15797, AvoK
 **Landscape.** Eviction grew from H2O/StreamingLLM → SnapKV → layer/head budgets → refined scoring rules (CriticalKV, DefensiveKV). The query-aware vs query-agnostic split matters: KVzip, RestoreKV and the query-visibility audit show query-aware results are inflated whenever caches are reused. The decode-heavy reasoning regime is the 2025–26 hot spot (R-KV, DMS, SeerAttention-R, 10+ preprints), but Random Attention claims random eviction of trace KV matches the best scorers. Representation compression is converging on learned/architectural solutions (TurboQuant; MHA/GQA→MLA conversion; NSA/MoBA/DSA in production). Hybrid linear/softmax architectures are now mainstream (MiniMax-01, Qwen3-Next, Kimi Linear) with a growing Transformer→hybrid distillation literature, and Attention Amnesia warns CoT SFT can wipe hybrid recall. Evaluation critique (SCBench, KVDiagnosis, 2607.05399) agrees aggregate scores and compression ratios mislead.
 
 **Gaps.**
-1. [untested-assumption] KV eviction on the few softmax layers of hybrid text models is unstudied (only DeltaS for video); linear-attention state as free eviction signal untested.
+1. [untested-assumption] KV eviction on the few softmax layers of hybrid text models — *[stale; corrected at novelty check: GateSight 2610.14754, HeadWiseKV 2609.02029, 2605.18053 now cover it as methods/side observations; see Novelty Verification]*.
 2. [contradiction] Random Attention vs scoring refinement — likely a prompt-heavy vs decode-heavy regime boundary.
 3. [diagnostic] Reasoning-eviction methods never re-ranked under multi-turn agentic reuse with query hidden.
 4. [method-transfer] DSA-style distilled lightning indexer as retrieval scorer for offloading in existing GQA models.
@@ -274,7 +276,7 @@ Also seen: s1 2501.19393, TALE 2412.18547, Chain of Draft 2502.18600, LC-R1 2506
 <a id="ranked-ideas"></a>
 ## Ranked Ideas
 
-**Ideas evaluated**: 18 个原始候选（3 个 lens 分片 × 6）→ 机械去重得 13 个 → 13 个全部通过客观可行性筛选 → 独立 triage 排序 → 前 3 名做深度新颖性检查 → 0 个跑了 pilot（无 GPU）。
+**Ideas evaluated**: 18 个原始候选（3 个 lens 分片 × 6）→ 机械去重得 13 个 → 13 个都通过了客观可行性筛选（*[评审修正：C4 的检查做得不到位，Nemotron-H-8B 只有 8K 上下文]*）→ 独立 triage 排序 → 前 3 名做深度新颖性检查 → 0 个跑了 pilot（无 GPU）。
 完整候选及标注见 [`candidate_pool.md`](candidate_pool.md)。
 
 > **Triage 的评审身份**：triage 由一个上下文全新的 Claude 子代理完成（魔鬼代言人，看不到生成过程，另做了 12 次检索）。它**不是** ARIS 要求的跨模型家族评审（Codex 不可用）。下面的排序应视为 provisional，需要等 GPT 类评审确认。
@@ -307,12 +309,14 @@ Also seen: s1 2501.19393, TALE 2412.18547, Chain of Draft 2502.18600, LC-R1 2506
   4. 在同一批 trace 上比较随机驱逐（保护 prompt）、R-KV 和 SnapKV，把"随机 vs 打分"的差距对 trace 冗余度（n-gram 复述率）做回归。
 - **Hypothesis**: 长度惩罚 RL 删掉的主要是低熵、高可投机、高冗余的填充内容，所以开 SD 时 token 节省会高估 wall-clock 节省，而且随机驱逐在压缩后的 trace 上不再"免费"。
 - **Minimum experiment**: R1-Distill-1.5B vs ThinkPrune-1.5B，200 道 MATH-500，离线 n-gram τ + vLLM SD，约 1 GPU-h。
-- **Kill criterion（triage 给出）**: 在两边都答对的题上，teacher-forced τ 的相对下降 < 10%。
+- ~~**Kill criterion（triage 给出）**: 在两边都答对的题上，teacher-forced τ 的相对下降 < 10%。~~ **[评审作废]** n-gram / suffix drafter 的 τ 会随历史长度增长，trace 变短会机械地拉低 τ，所以这个未做匹配的标准偏向 PROCEED。修正后的 kill / promote 标准见 [External Critical Review](#external-critical-review)。
 - **Risk**: MEDIUM。具名风险：(a) drafter 偏移解释了全部下降，结论退化成"重训 drafter 就好"；(b) serving batch 下 SD 本来就收益有限；(c) 父模型配对必须正确。
 - **Contribution type**: empirical + diagnostic
 - **Pilot**: SKIPPED（无 GPU）
 
-### 🥈 Idea 2: C4 — 混合架构的 softmax 层需要不同的 KV 驱逐策略
+### ❌ C4（评审阶段 ABANDON）— 混合架构的 softmax 层需要不同的 KV 驱逐策略
+
+> 原排名第 2，在 External Critical Review 中被判 ABANDON，原因见该节。下面保留原方案供参考。
 - **Method**:
   1. 选尺寸匹配的混合 / 稠密模型对：Nemotron-H-8B vs Llama-3.1-8B / Qwen3-8B、Falcon-H1-7B、Mamba-in-the-Llama 蒸馏模型 vs 其父模型。
   2. 只对 softmax 层的 KV 施加相同的驱逐策略（sink+window、SnapKV、随机、Ada-KV / PyramidKV 预算），预算 5–50%。
@@ -324,7 +328,7 @@ Also seen: s1 2501.19393, TALE 2412.18547, Chain of Draft 2502.18600, LC-R1 2506
 - **Contribution type**: empirical + diagnostic
 - **Pilot**: SKIPPED（无 GPU）
 
-### 🥉 Idea 3: C2 — Thinking MLLM 对视觉 token 剪枝更脆弱，且脆弱程度随思考长度增长
+### 🥈 Idea 2（评审后升为第二）: C2 — Thinking MLLM 对视觉 token 剪枝更脆弱，且脆弱程度随思考长度增长
 - **Method**:
   1. 用 Qwen3-VL-{2,4,8}B 的 Instruct / Thinking 匹配对。
   2. 在 prefill 时一次性剪枝（随机、FastV、DART、下采样），保留 50/25/11%。
@@ -343,6 +347,7 @@ Also seen: s1 2501.19393, TALE 2412.18547, Chain of Draft 2502.18600, LC-R1 2506
 
 | Idea | 原因 |
 |---|---|
+| C4 混合架构 softmax 层 KV 驱逐 | **评审阶段 ABANDON**：(1) 主力模型 Nemotron-H-8B-Base 只有 8K 上下文，在 32K–128K 测到的是外推失败，不是驱逐的效应；(2) Falcon-H1 是并行混合结构，不符合"少量 softmax 层"的前提；(3) 128K 时 softmax KV 约 2 GiB，驱逐 90% 只省约 1.8 GiB / 序列；(4) 已有证据倾向于否定原假设；(5) GateSight、HeadWiseKV、DeltaS 三篇同期方法论文已占据这块。复活条件：找到有父模型对应、上下文 ≥32K 的混合模型，并且 4K/8K 训练长度内的测试（约 2 GPU-h）出现断崖 |
 | C13 量化 × KV 驱逐叠加 | 大部分已被 "Not All Bits Are Equal" 2510.10964（ICLR'26，1700+ 组 GPTQ × R-KV 配置）和 ThinKV 2510.01290 覆盖；只剩形式化的中介分析 |
 | C6 Fork-token KL 预测器 | 2606.00206 已报告量化 KL 集中在高熵 token；跨家族预测只在约 10 个点上，统计上脆弱 |
 | C11 grounded-token 一致率 | grounded 判定与 VIG 2608.21883 的打分几乎相同；可能只复现 hard subset 排名 |
@@ -380,3 +385,138 @@ Also seen: s1 2501.19393, TALE 2412.18547, Chain of Draft 2502.18600, LC-R1 2506
 - **核心空白**：没有匹配的 Instruct vs Thinking 剪枝对照（3 个尺寸 + 只统计两边都答对的题），也没有在同一 checkpoint 内扫思考预算。DSTP、VisionPulse、ViMoD 都只是借"解码期偏移"来引出各自的方法。
 - **必须先人工核对**：DSTP 的结果表里**可能已经同时有 Qwen3-VL-4B 的 Instruct 和 Thinking 两行**（只有一条摘录提到，未核实）。如果有，claim 1 降级为"在 3 个尺寸上加 both-correct 控制的确认性结果"，改以 claim 2–3（晚期证据的因果测量 + 思考预算曲线）为主线。
 - **反向证据**（让问题不那么显然，但会提高立论门槛）：On Test-Time Scaling for VLMs（图像的贡献在早期之后急剧下降）、TVC（后半段去掉图像只掉约 2 分）、VisualSwap（Thinking 模型的"重看"往往没有真正去看图）。→ 晚期证据必须用**因果消融**来证明，不能只看注意力。
+
+---
+
+<a id="external-critical-review"></a>
+## External Critical Review
+
+- **评审方**：上下文全新的 Claude 子代理，按 NeurIPS/ICML 资深审稿人的对抗式标准评审，另做了 11 次检索来抽查事实。**属于同家族评审，不是 ARIS 要求的跨模型家族（GPT）评审。**
+- **完整 trace**：[`.aris/traces/research-review/brief.md`](../.aris/traces/research-review/brief.md)、[`review_round1.md`](../.aris/traces/research-review/review_round1.md)
+
+| 方向 | 判定 | 模拟评分（按原计划 → 补齐控制后） | 档次 |
+|---|---|---|---|
+| **C1+C5** 压缩吃掉冗余 | **PROCEED（第一顺位）** | 5 → 6 /10 | Findings / 主会 borderline |
+| **C2** Thinking MLLM 剪枝 | **PROCEED（第二顺位）** | 5 → 6 /10 | Findings / 主会 borderline |
+| **C4** 混合架构 KV 驱逐 | **ABANDON** | 4 /10 | workshop / Findings |
+
+### 评审核实过的事实
+- DeepScaleR-1.5B 微调自 R1-Distill-Qwen-1.5B。ThinkPrune 有两个 checkpoint（`…R1-Distill-Qwen-1.5B-thinkprune-iter2k` 和 `…DeepScaleR-1.5B-Preview-thinkprune-iter2k`），配对时必须明确选哪一个。
+- 没有找到 R1-Distill-Qwen-1.5B/7B 的公开 EAGLE-3 head，需要自己训练。
+- Nemotron-H-8B-Base 只有 **8K 上下文**（52 层里只有 4 层 attention）；Falcon-H1 是**并行**混合结构。
+- DREAM-R 2605.28678 在多模态消融实验中已报告"长度奖励越强，验证接受率越低"，必须作为部分先例引用。
+
+### C1+C5：关键缺陷（按严重程度排序）
+1. **主指标有长度偏差（最严重）。** prompt-lookup / suffix drafter 的 τ 会随历史长度增长，压缩后的 trace 更短，τ 会被机械地拉低。→ 要同时报告三种口径：按**绝对解码位置分桶**、**固定查找窗口**（如最近 2K token）、不做匹配。
+2. **位置匹配可能把效应本身抹掉**（冗余可能集中在冗长 trace 的后段）。→ **预注册**两种结论：(a) 相同位置 τ 更低 = 每 token 可投机性税；(b) 相同位置 τ 相等，但压缩模型删掉了高 τ 段 = 组合效应。
+3. **"一个冗余统计量预测两者"对 n-gram τ 来说是循环论证。** → 预测性结论只限于 EAGLE / 模型 drafter 的 τ 和驱逐差距。
+4. **忽略了反向效应。** 注意力和 KV 读取的代价随上下文增长（Kinetics），trace 减半带来的 wall-clock 节省本来就**超过**一半。→ 头条结论只能用**实测 wall-clock** 来支撑，结果也可能反过来。
+5. 1.5B target 上做 SD 的部署意义很小。→ wall-clock 和 EAGLE 的结论放在 7B 上做，用 R1-Distill-1.5B 当同族 drafter。
+6. 重蒸馏 drafter 时要**按 token 数匹配**，并测全部交叉组合（d_v→m_v、d_v→m_c、d_c→m_c）。
+7. AdaptThink 是 think / no-think 的混合，必须按模式分层。
+8. 用 T≈0.6 的采样 trace（greedy 解码会循环，n-gram τ 会虚高）。期望接受长度直接用 target 的概率计算，对无损 SD 是精确的，一次前向即可。
+9. both-correct 筛选会带来**向均值回归**。→ 定义为 ≥3/4 次答对，并加一组不做任何扰动的重采样对照。
+10. **C5 的具体问题**：
+    - 低预算下存在地板效应 → 在相同随机基线精度下比较差距。
+    - R-KV 本身就是冗余感知方法，在冗余少的 trace 上同样会失去信号 → 差距的方向其实不确定。
+    - **逐头冗余不受长度压缩影响**，会限制效应的大小 → 随机基线必须逐头独立，和原论文一致。
+    - 相对预算和绝对预算都要报告。
+
+**最便宜的判别实验（约 1.5 GPU-h）**：DeepScaleR-1.5B→L1-1.5B-Max 和 R1-Distill-1.5B→thinkprune-iter2k；200 道 MATH-500 × 4 个样本，T=0.6，16K 上限；一次前向拿到 log-prob，算 prompt-lookup 的期望接受长度（n=3, k=5），分三种口径：不匹配、按位置分桶（0–1K / 1–2K / 2–4K）、最近 2K 窗口；再对 L1 在同一权重下扫 3 个目标长度。
+- **Kill**：两个模型对在所有匹配桶里的下降都 <10%，**并且**不匹配口径下的下降在匹配后消失，**并且** L1 的长度扫描是平的。
+- **Promote**：两个模型对在固定窗口 + 匹配位置下都下降 ≥15%，**并且**同一权重下 τ 随 L1 目标长度变短而下降 → 进入 7B + EAGLE-3。
+- **介于两者之间**：只能按"删掉高 τ 段"的组合效应结论继续，并先预注册。
+
+**结果 → 结论矩阵**
+
+| SD 结果 | 驱逐结果 | 可主张的结论 | 是否成文 |
+|---|---|---|---|
+| A：7B 上 n-gram 和重蒸馏 EAGLE-3 在匹配位置下降 ≥15%，实测有效压缩比差于 token 比 | F：在相同随机基线精度下差距扩大，且在 ≥5 个模型点上与冗余度相关 | 完整论点 | 主会 borderline（约 6） |
+| A | G：差距不变 | SD 税存在；压缩删掉的不是"复述"，逐头冗余才是主因 | Findings / 主会 borderline |
+| B：匹配后下降消失 | 任意 | 长度伪影的方法论 note | Workshop；驱逐结果为 F 时可投 Findings |
+| C：token 匹配的重蒸馏后 EAGLE-3 下降消失 | 任意 | "重训 drafter 即可" | Workshop |
+| D：τ 不变或升高 | G | 压缩与 SD、驱逐可以相乘叠加 | 短文 / 负结果 |
+| E：τ 下降，但 KV 读取节省掩盖了它（wall-clock 比 ≤ token 比） | F | 税存在但被注意力代价的节省掩盖；驱逐不再免费 | Findings |
+| 任意 | H：差距只在绝对预算下出现 | 预算伪影 | 否 |
+
+**最小实验包（约 300 GPU-h ≈ 1.8 GPU-周，按每 GPU-h 带来的接收概率提升排序）**
+
+| # | 内容 | 成本 |
+|---|---|---|
+| P0 | 上面的判别实验，作为闸门 | ~1.5 GPU-h |
+| P1 | 生成 trace：R1-Distill-7B → LC-R1-7B / AdaptThink-7B（按模式分层）+ 两个 1.5B 对；500 道 MATH-500 + 60 道 AIME × 4 样本，T=0.6，16–32K 上限 | ~25 GPU-h |
+| P2 | 离线期望接受长度：n-gram（匹配 + 窗口）+ 用 R1-Distill-1.5B 给 7B 当 drafter | ~10 GPU-h |
+| P3 | 按 token 数匹配训练 EAGLE-3 head（7B 父模型 + 2 个子模型）并做交叉评测；只有 P0 / P2 判定 promote 才做 | ~150 GPU-h |
+| P4 | vLLM 实测 wall-clock：batch 1 / 32 / 128 × {无 SD, n-gram, EAGLE-3}，检验反向效应 | ~20 GPU-h |
+| P5 | on-policy 驱逐：Random Attention 官方代码（逐头随机）vs R-KV vs SnapKV；相对 10/25/50% + 绝对 1K/2K/4K；在相同随机基线精度下比较；≥6 个模型点 | ~80 GPU-h |
+| P6 | 所有精度比较都加重采样对照，并报告 bootstrap 置信区间 | ~10 GPU-h |
+
+### C2：关键缺陷
+1. **向均值回归是最可能的假阳性来源**：长的采样思考 trace 自洽性更差，即使剪枝毫无影响，也会显得"剪枝惩罚更大"。→ 必须加 keep=100% 的重采样对照，both-correct 定义为 ≥k/n 次答对。
+2. **最小实验缺少对机制的因果检验**，而反向证据（TVC、VisualSwap、2606.28864）恰好集中在这里。
+3. 思考预算扫描与基础精度水平混杂 → 同时报告绝对损失。
+4. Qwen3-VL 的 DeepStack 多层特征注入会与 LLM 内部的 FastV 式剪枝相互作用（评审凭记忆提出，待核实）。
+5. DSTP 可能已覆盖 claim 1 → 先查它的表（不花 GPU）。
+
+**最便宜的判别实验（约 2 GPU-h，先花 0 GPU 查 DSTP 的表）**：Qwen3-VL-4B-Thinking，300 道 MathVista × 3 样本，4K 上限。(a) 生成到自身 CoT 长度的 50% 之后，mask 掉全部视觉 KV；(b) 在 Thinking 和 Instruct-4B 上做随机 25% prefill 剪枝，并加 keep=100% 的重采样对照。
+- **Kill**：(a) 掉分 <3（复现了 TVC 的结论），或 (b) 扣除对照后的比值 <1.3。
+- **Promote**：(a) 掉分 ≥8，**并且** (b) 扣除对照后的比值 ≥1.5。
+
+| 结果 | 结论 | 是否成文 |
+|---|---|---|
+| 3 个尺寸上扣除对照后比值 ≥1.5，晚期 mask 有因果效应，损失随预算增长 | Thinking MLLM 需要解码期的视觉访问；针对它们的 prefill 剪枝评测不成立 | 主会 borderline（约 6） |
+| 比值高，但晚期 mask 代价小 | 更敏感，但原因不是晚期证据 | Findings |
+| 比值 ≈1 | prefill 剪枝可以迁移到 thinking 模型 | Workshop |
+| Thinking 损失更小 | test-time compute 可以替代视觉 token | Findings / 主会（结果稳健的话） |
+| 加入重采样对照后效应消失 | 选择偏差造成的伪影 | 否 |
+
+### C4：ABANDON 的理由
+(1) 主力模型对没法在声称的长度上运行（Nemotron-H-8B 只有 8K 上下文）；(2) Falcon-H1 不符合前提；(3) 显存收益约 1.8 GiB / 序列；(4) 已有证据倾向于否定原假设；(5) 三篇同期方法论文已占据这块。**复活条件**：找到有父模型对应、上下文 ≥32K 的混合模型（如 HALO/HypeNet 的 Qwen3 转换版、Jet-Nemotron），并在训练长度内的测试（RULER 4K/8K，约 2 GPU-h）中看到断崖：窗口驱逐下比稠密模型多掉 ≥20 分，而 SnapKV 的差距 <5 分。
+
+### 评审对文献综述的勘误（已在上文就地标注）
+- §1.B gap 1 的"混合架构驱逐无人研究"已过时 → 已标注。
+- C4 的可行性筛选做得不到位 → 已标注。
+- C1 的"没人测过"需要限定：DREAM-R 在多模态场景下已有部分先例。
+- n-gram / suffix τ 没有训练偏差，但强烈依赖历史长度 → 原 kill criterion 已作废。
+- 综合部分第 1 条把两种随机基线危机合并得过快 → 已修正。
+- 综合部分第 4 条"没人报 cost per solved problem"说得太强；Kinetics 的结论会反向影响 C1 → 已修正。
+- 2605.18053 是单作者预印本，PAGE 部分反驳了它，原先给它的权重偏高。
+- **评审认为成立的部分**：L1 / LC-R1 / AdaptThink 的父子配对；离线期望接受长度的方法；Qwen3-VL 的 2/4/8B Instruct / Thinking 匹配对；对 Random Attention 的描述；对过度拥挤方向的判断。
+
+---
+
+## 最终结论
+
+### 🏆 Idea 1: C1+C5 "压缩吃掉冗余" — RECOMMENDED
+- Pilot: SKIPPED（无 GPU），第一个闸门是约 1.5 GPU-h 的 P0
+- Novelty: PROCEED 7/10（最近的工作：Random Attention 2609.03430、R-KV、ReCo 2608.04771、DREAM-R 2605.28678）
+- Reviewer: PROCEED，5 → 6/10（同家族评审）
+- 下一步：P0 → P1/P2 → （promote 后）P3–P6
+
+### 🥈 Idea 2: C2 Thinking MLLM 剪枝 — BACKUP
+- 先花 0 GPU 查 DSTP 的结果表 → 做约 2 GPU-h 的晚期 mask 因果测试
+- Novelty: PROCEED 6/10；Reviewer: PROCEED，5 → 6/10
+
+### 低成本附带 pilot：C9（PTQ 是否抹掉 RL 增量，约 1.5 GPU-h）
+### 备选：C3（MoE 剪枝 vs 合并看 pass@k）、C7+C8（随机基线诊断）、C12（多轮视觉 KV）
+
+## Refined Proposal
+- `/research-refine-pipeline` **本次没有运行**：用户只要求文献调研和选题，而且没有 GPU、没有跨模型评审，`FINAL_PROPOSAL.md` 不存在。下一步可以对 C1+C5 运行 `/research-refine-pipeline`，生成 `refine-logs/FINAL_PROPOSAL.md` 和 `EXPERIMENT_PLAN.md`。
+
+## Next Steps
+- [ ] 人工复核关键论文的全文：Random Attention 2609.03430（确认没有测过简洁模型）、DSTP 2604.12358（确认有没有 Thinking 行）、DREAM-R 2605.28678
+- [ ] 配置跨模型评审（Codex：`npm i -g @openai/codex && codex login`，然后 `claude mcp add codex …`），对 novelty-check 和 research-review 补一轮 GPT 评审，拿到 ARIS 的 acceptance receipt
+- [ ] 在有 GPU 的环境中跑 C1 的 P0（约 1.5 GPU-h）和 C2 的晚期 mask 测试（约 2 GPU-h），可选再跑 C9
+- [ ] 对通过闸门的 idea 运行 `/research-refine-pipeline` → `/experiment-bridge` → `/auto-review-loop`
+
+> **关于下面的 BLOCKED**：这是 ARIS 确定性 evidence gate 的如实输出，不是报告缺内容。novelty-check 和 research-review 两节内容完整，但评审方是同家族 Claude 子代理，没有跨模型家族（GPT / Codex）的 acceptance receipt，按规则不能也不应伪造。research-refine-pipeline 按用户的范围（调研 + 选题）跳过了。配置好 Codex 后运行 `/idea-discovery "…" — resume llm-mllm-efficiency-20261017`，即可补齐这三项。
+
+<!-- ARIS_IDEA_DISCOVERY_EVIDENCE_GATE:START -->
+## Evidence Gate
+**Status:** BLOCKED
+
+The workflow is not complete. Required stage evidence is missing:
+- BLOCKED: novelty-check review evidence missing (status=done)
+- BLOCKED: research-review review evidence missing (status=done)
+- BLOCKED: research-refine-pipeline evidence missing (status=skipped)
+<!-- ARIS_IDEA_DISCOVERY_EVIDENCE_GATE:END -->

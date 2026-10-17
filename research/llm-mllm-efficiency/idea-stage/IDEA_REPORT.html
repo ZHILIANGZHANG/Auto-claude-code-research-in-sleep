@@ -1,0 +1,872 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Idea Discovery Report — LLM / MLLM Efficiency</title>
+
+<meta name="generator" content="ARIS render-html (academic, v1)">
+<meta name="aris:source-path" content="idea-stage/IDEA_REPORT.md">
+<meta name="aris:source-sha256" content="109810cf0c588544cdefee0ec4856eaa5f2a05255bf031f6fdba6449a1fee043">
+<meta name="aris:generated-at" content="2026-10-17 15:08 UTC">
+
+<!-- offline mode: MathJax + highlight.js skipped; math and code blocks render as plain text -->
+
+<style>
+:root {
+  --bg: #fdfcf7;
+  --bg-soft: #f4f1ea;
+  --bg-code: #f8f5ec;
+  --ink: #1a1a1a;
+  --ink-soft: #4a4a4a;
+  --ink-muted: #6b6b6b;
+  --primary: #1a4a8c;
+  --primary-soft: #2d6cb8;
+  --accent: #b8390e;
+  --warn: #b45309;
+  --warn-bg: #fef3c7;
+  --info-bg: #dbeafe;
+  --good-bg: #d1fae5;
+  --good: #065f46;
+  --bad-bg: #fee2e2;
+  --bad: #991b1b;
+  --border: #d6d0c0;
+  --border-soft: #e8e3d5;
+}
+
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+
+body {
+  font-family: "Source Serif Pro", "Source Serif 4", "Crimson Pro", "Georgia", "Songti SC", "STSong", serif;
+  line-height: 1.65;
+  color: var(--ink);
+  background: var(--bg);
+  margin: 0;
+  padding: 0;
+  font-size: 16px;
+}
+
+.layout {
+  max-width: 1280px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  gap: 48px;
+  padding: 40px 32px;
+}
+
+nav.toc {
+  position: sticky;
+  top: 24px;
+  align-self: start;
+  font-size: 13px;
+  max-height: calc(100vh - 48px);
+  overflow-y: auto;
+  border-right: 1px solid var(--border-soft);
+  padding-right: 16px;
+}
+nav.toc h3 {
+  margin: 0 0 12px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ink-muted);
+  font-weight: 600;
+}
+nav.toc ol { list-style: none; padding: 0; margin: 0; counter-reset: toc; }
+nav.toc ol li { margin: 5px 0; counter-increment: toc; }
+nav.toc ol li::before { content: counter(toc) ". "; color: var(--ink-muted); margin-right: 4px; }
+nav.toc a {
+  color: var(--ink-soft);
+  text-decoration: none;
+  border-bottom: 1px dotted transparent;
+}
+nav.toc a:hover { color: var(--primary); border-bottom-color: var(--primary); }
+nav.toc ul { list-style: none; padding-left: 14px; margin: 3px 0; font-size: 12px; }
+nav.toc ul li::before { content: "→ "; color: var(--border); }
+
+main { min-width: 0; }
+
+header.hero {
+  border-bottom: 3px double var(--primary);
+  padding-bottom: 24px;
+  margin-bottom: 32px;
+}
+header.hero .eyebrow {
+  color: var(--accent);
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+body.aris-blog header.hero .eyebrow {
+  font-family: inherit;
+  color: var(--ink-muted);
+  text-transform: none;
+  letter-spacing: 0.01em;
+  font-weight: 400;
+}
+header.hero h1 {
+  font-size: 32px;
+  line-height: 1.2;
+  margin: 0 0 12px;
+  color: var(--ink);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+header.hero .subtitle {
+  font-size: 16px;
+  color: var(--ink-soft);
+  margin: 0 0 8px;
+  font-style: italic;
+}
+header.hero .byline {
+  font-size: 14px;
+  color: var(--ink-soft);
+  margin: 0 0 20px;
+}
+header.hero .byline strong {
+  color: var(--ink);
+  font-weight: 600;
+}
+header.hero .meta {
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+  font-size: 12px;
+  color: var(--ink-muted);
+  border-top: 1px solid var(--border-soft);
+  padding-top: 14px;
+}
+header.hero .meta span strong { color: var(--ink-soft); }
+header.hero .meta code {
+  font-family: "JetBrains Mono", "SF Mono", "Menlo", "Consolas", monospace;
+  font-size: 11px;
+  background: var(--bg-soft);
+  padding: 1px 5px;
+  border-radius: 3px;
+  border: 1px solid var(--border-soft);
+}
+
+h2 {
+  font-size: 24px;
+  margin: 44px 0 14px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+  color: var(--ink);
+  font-weight: 700;
+}
+h2 .num { color: var(--primary); font-weight: 600; margin-right: 8px; }
+h3 { font-size: 19px; margin: 28px 0 10px; color: var(--primary); font-weight: 600; }
+h4 { font-size: 16px; margin: 20px 0 8px; color: var(--ink); font-weight: 600; }
+
+p { margin: 10px 0; }
+ul, ol { padding-left: 22px; margin: 10px 0; }
+ul li, ol li { margin: 4px 0; }
+ul li::marker { color: var(--primary); }
+
+strong { color: var(--accent); font-weight: 600; }
+em { color: var(--ink-soft); }
+
+a { color: var(--primary); }
+a:hover { color: var(--accent); }
+
+code:not(.hljs) {
+  font-family: "JetBrains Mono", "SF Mono", "Menlo", "Consolas", monospace;
+  font-size: 0.86em;
+  background: var(--bg-code);
+  padding: 1px 5px;
+  border-radius: 3px;
+  border: 1px solid var(--border-soft);
+  color: var(--accent);
+}
+
+pre {
+  background: #fafaf6;
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--primary);
+  padding: 0;
+  overflow-x: auto;
+  border-radius: 4px;
+  margin: 14px 0;
+}
+pre code, pre code.hljs {
+  background: transparent !important;
+  display: block;
+  padding: 14px 18px !important;
+  font-size: 13px;
+  line-height: 1.55;
+  font-family: "JetBrains Mono", "SF Mono", "Menlo", monospace;
+  color: var(--ink);
+}
+pre.diagram {
+  background: #f9f6ed;
+  border-left: 4px solid var(--accent);
+  font-size: 12.5px;
+  line-height: 1.4;
+}
+
+.callout {
+  margin: 16px 0;
+  padding: 12px 16px;
+  border-radius: 4px;
+  border-left: 4px solid;
+  font-size: 15px;
+}
+.callout-title {
+  font-weight: 600;
+  margin-bottom: 6px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.callout-info { background: var(--info-bg); border-left-color: var(--primary); }
+.callout-info .callout-title { color: var(--primary); }
+.callout-warn { background: var(--warn-bg); border-left-color: var(--warn); }
+.callout-warn .callout-title { color: var(--warn); }
+.callout-good { background: var(--good-bg); border-left-color: var(--good); }
+.callout-good .callout-title { color: var(--good); }
+.callout-bad { background: var(--bad-bg); border-left-color: var(--bad); }
+.callout-bad .callout-title { color: var(--bad); }
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 16px 0;
+  font-size: 14px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  overflow: hidden;
+}
+thead { background: var(--primary); color: white; }
+th, td {
+  text-align: left;
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--border-soft);
+  vertical-align: top;
+}
+th { font-weight: 600; font-size: 13px; letter-spacing: 0.02em; }
+tr:last-child td { border-bottom: none; }
+tbody tr:nth-child(even) { background: var(--bg-soft); }
+
+details.qa, details {
+  background: white;
+  border: 1px solid var(--border-soft);
+  border-radius: 6px;
+  margin: 10px 0;
+  padding: 0;
+}
+details summary {
+  cursor: pointer;
+  padding: 10px 14px;
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--primary);
+  list-style: none;
+  user-select: none;
+}
+details summary::-webkit-details-marker { display: none; }
+details summary::before {
+  content: "▸ ";
+  margin-right: 4px;
+  display: inline-block;
+  transition: transform 0.15s;
+}
+details[open] summary::before { transform: rotate(90deg); }
+details[open] summary { border-bottom: 1px solid var(--border-soft); }
+details > :not(summary) { padding: 10px 14px; }
+details p:first-of-type { margin-top: 8px; }
+
+mjx-container[display="true"] { margin: 12px 0 !important; }
+
+footer.aris-footer {
+  margin-top: 60px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
+  font-size: 12px;
+  color: var(--ink-muted);
+}
+footer.aris-footer a { color: var(--ink-muted); border-bottom: 1px dotted var(--border); }
+
+@media (max-width: 900px) {
+  .layout { grid-template-columns: 1fr; gap: 20px; padding: 20px 16px; }
+  nav.toc {
+    position: static;
+    max-height: none;
+    border-right: none;
+    border-bottom: 1px solid var(--border-soft);
+    padding-right: 0;
+    padding-bottom: 14px;
+  }
+  header.hero h1 { font-size: 24px; }
+  h2 { font-size: 20px; }
+}
+@media print {
+  nav.toc { display: none; }
+  .layout { grid-template-columns: 1fr; padding: 0; }
+  body { background: white; }
+  header.hero { border-bottom-color: var(--ink); }
+  #cite-pop, dialog.lightbox { display: none !important; }
+}
+
+/* --- P0 polish: TOC scrollspy active state ---------------------------- */
+nav.toc a.active {
+  color: var(--accent);
+  font-weight: 600;
+  border-bottom-color: var(--accent);
+}
+
+/* --- P0 polish: Long-code auto-collapse ------------------------------- */
+details.code-card {
+  margin: 14px 0;
+  background: #fafaf6;
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--primary);
+  border-radius: 4px;
+}
+details.code-card > summary {
+  cursor: pointer;
+  padding: 8px 14px;
+  color: var(--ink-soft);
+  font-size: 13px;
+  font-family: "JetBrains Mono", "SF Mono", monospace;
+  list-style: none;
+  user-select: none;
+}
+details.code-card > summary::-webkit-details-marker { display: none; }
+details.code-card > summary::before { content: none; }
+details.code-card > pre {
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-left: none;
+  border-radius: 0;
+}
+@media print {
+  details.code-card { border: 1px solid #ccc; background: white; }
+  details.code-card > summary { display: none !important; }
+  details.code-card > pre { border: 1px solid #ddd; border-radius: 4px; background: white; }
+}
+
+/* --- P0 polish: Paper popover ([[ref]] popups) ------------------------ */
+[data-ref] {
+  color: var(--primary);
+  border-bottom: 1px dotted var(--primary);
+  cursor: pointer;
+  white-space: nowrap;
+}
+[data-ref]:hover { background: rgba(26, 74, 140, 0.08); }
+#cite-pop {
+  position: fixed;
+  width: 360px;
+  max-width: calc(100vw - 32px);
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 14px 16px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  font-size: 13px;
+  line-height: 1.5;
+  z-index: 1000;
+}
+#cite-pop[hidden] { display: none; }
+#cite-pop .cp-title {
+  font-weight: 600;
+  color: var(--ink);
+  margin-bottom: 4px;
+  padding-right: 24px;
+}
+#cite-pop .cp-meta {
+  color: var(--ink-muted);
+  font-size: 12px;
+  margin-bottom: 6px;
+}
+#cite-pop .cp-key {
+  color: var(--accent);
+  font-style: italic;
+  margin-bottom: 8px;
+}
+#cite-pop .cp-link {
+  display: inline-block;
+  color: var(--primary);
+  font-weight: 500;
+}
+#cite-pop .cp-close {
+  position: absolute;
+  top: 6px;
+  right: 10px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 16px;
+  color: var(--ink-muted);
+}
+
+/* --- P0 polish: Figure lightbox (native <dialog>) --------------------- */
+dialog.lightbox {
+  border: none;
+  padding: 0;
+  background: rgba(0, 0, 0, 0.92);
+  width: 96vw;
+  height: 96vh;
+  max-width: 96vw;
+  max-height: 96vh;
+}
+dialog.lightbox::backdrop { background: rgba(0, 0, 0, 0.92); }
+dialog.lightbox .lb-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: 16px;
+  position: relative;
+}
+dialog.lightbox img {
+  max-width: 90vw;
+  max-height: 84vh;
+  object-fit: contain;
+  cursor: zoom-out;
+}
+dialog.lightbox figcaption {
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 14px;
+  text-align: center;
+  max-width: 700px;
+}
+dialog.lightbox .lb-close {
+  position: absolute;
+  top: 16px;
+  right: 20px;
+  background: none;
+  border: none;
+  color: white;
+  font-size: 28px;
+  cursor: pointer;
+}
+
+/* --- P0 polish: blog/talk mode active-H2 highlight (opt-in) ----------- */
+body.aris-blog h2 { scroll-margin-top: 24px; }
+body.aris-blog h2.aris-active-h2 {
+  background: linear-gradient(to right, rgba(26, 74, 140, 0.06), transparent);
+  border-radius: 4px;
+  padding-left: 12px;
+  margin-left: -12px;
+}
+</style>
+</head>
+<body class="">
+<div class="layout">
+
+<nav class="toc">
+  <h3>Contents</h3>
+  <ol>
+<li><a href="#executive-summary">Executive Summary</a>
+</li>
+<li><a href="#literature-landscape">Literature Landscape</a>
+<ul>
+<li><a href="#0-跨方向综合四个分片共同指向的结构性规律">0. 跨方向综合（四个分片共同指向的结构性规律）</a></li>
+<li><a href="#1a-mllm--video-llm--vla-token-efficiency">1.A MLLM / Video-LLM / VLA token efficiency</a></li>
+<li><a href="#1b-kv-cache--long-context-efficiency">1.B KV cache &amp; long-context efficiency</a></li>
+<li><a href="#1c-model-compression-quantization-pruningsparsity-moe">1.C Model compression: quantization, pruning/sparsity, MoE</a></li>
+<li><a href="#1d-decoding-acceleration--efficient-reasoning">1.D Decoding acceleration &amp; efficient reasoning</a></li>
+</ul>
+</li>
+<li><a href="#ranked-ideas">Ranked Ideas</a>
+<ul>
+<li><a href="#triage-排序n--新颖性i--信息价值f--可行性各-110">Triage 排序（N = 新颖性，I = 信息价值，F = 可行性，各 1–10）</a></li>
+<li><a href="#idea-1-c1c5--压缩吃掉了冗余cot-长度压缩对投机解码与-kv-驱逐的隐性代价">🥇 Idea 1: C1+C5 — &quot;压缩吃掉了冗余&quot;：CoT 长度压缩对投机解码与 KV 驱逐的隐性代价</a></li>
+<li><a href="#c4评审阶段-abandon-混合架构的-softmax-层需要不同的-kv-驱逐策略">❌ C4（评审阶段 ABANDON）— 混合架构的 softmax 层需要不同的 KV 驱逐策略</a></li>
+<li><a href="#idea-2评审后升为第二-c2--thinking-mllm-对视觉-token-剪枝更脆弱且脆弱程度随思考长度增长">🥈 Idea 2（评审后升为第二）: C2 — Thinking MLLM 对视觉 token 剪枝更脆弱，且脆弱程度随思考长度增长</a></li>
+<li><a href="#备选c3moe-剪枝-vs-合并-passkc9ptq-是否抹掉-rl-增量约-15-gpu-h可当-side-pilot">备选：C3（MoE 剪枝 vs 合并 pass@k）、C9（PTQ 是否抹掉 RL 增量，约 1.5 GPU-h，可当 side pilot）</a></li>
+</ul>
+</li>
+<li><a href="#eliminated--deprioritized-ideas">Eliminated / Deprioritized Ideas</a>
+</li>
+<li><a href="#novelty-verification">Novelty Verification</a>
+<ul>
+<li><a href="#c1c5710proceed">C1+C5（7/10，PROCEED）</a></li>
+<li><a href="#c4610proceed竞争激烈">C4（6/10，PROCEED，竞争激烈）</a></li>
+<li><a href="#c2610proceed">C2（6/10，PROCEED）</a></li>
+</ul>
+</li>
+<li><a href="#external-critical-review">External Critical Review</a>
+<ul>
+<li><a href="#评审核实过的事实">评审核实过的事实</a></li>
+<li><a href="#c1c5关键缺陷按严重程度排序">C1+C5：关键缺陷（按严重程度排序）</a></li>
+<li><a href="#c2关键缺陷">C2：关键缺陷</a></li>
+<li><a href="#c4abandon-的理由">C4：ABANDON 的理由</a></li>
+<li><a href="#评审对文献综述的勘误已在上文就地标注">评审对文献综述的勘误（已在上文就地标注）</a></li>
+</ul>
+</li>
+<li><a href="#最终结论">最终结论</a>
+<ul>
+<li><a href="#idea-1-c1c5-压缩吃掉冗余--recommended">🏆 Idea 1: C1+C5 &quot;压缩吃掉冗余&quot; — RECOMMENDED</a></li>
+<li><a href="#idea-2-c2-thinking-mllm-剪枝--backup">🥈 Idea 2: C2 Thinking MLLM 剪枝 — BACKUP</a></li>
+<li><a href="#低成本附带-pilotc9ptq-是否抹掉-rl-增量约-15-gpu-h">低成本附带 pilot：C9（PTQ 是否抹掉 RL 增量，约 1.5 GPU-h）</a></li>
+<li><a href="#备选c3moe-剪枝-vs-合并看-passkc7c8随机基线诊断c12多轮视觉-kv">备选：C3（MoE 剪枝 vs 合并看 pass@k）、C7+C8（随机基线诊断）、C12（多轮视觉 KV）</a></li>
+</ul>
+</li>
+<li><a href="#refined-proposal">Refined Proposal</a>
+</li>
+<li><a href="#next-steps">Next Steps</a>
+</li>
+<li><a href="#evidence-gate">Evidence Gate</a>
+</li>
+</ol>
+</nav>
+
+<main>
+<header class="hero">
+  
+  <h1>Idea Discovery Report — LLM / MLLM Efficiency</h1>
+  <p class="subtitle">ARIS Workflow 1 · 文献调研 + 选题 · 2026-10-17</p>
+  
+  <div class="meta">
+    <span><strong>Source:</strong> <code>idea-stage/IDEA_REPORT.md</code></span>
+    <span><strong>SHA256:</strong> <code>109810cf0c58</code></span>
+    <span><strong>Rendered:</strong> 2026-10-17 15:08 UTC</span>
+    
+  </div>
+</header>
+
+<h1 id="idea-discovery-report--llm--mllm-efficiency">Idea Discovery Report — LLM / MLLM Efficiency</h1>
+<p><strong>Direction</strong>: LLM / MLLM 效率（KV cache 压缩、MLLM 视觉 token 剪枝/合并、量化、稀疏/剪枝、投机解码、高效长上下文、高效推理 / CoT 压缩、MoE 效率）— 文献调研 + 选题 <strong>Date</strong>: 2026-10-17 <strong>Pipeline</strong>: research-lit → idea-creator → novelty-check → research-review（research-refine-pipeline 留作下一步） <strong>Run ID</strong>: <code>llm-mllm-efficiency-20261017</code>（<code>.aris/runs/</code>）</p>
+<div class="callout callout-warn"><div class="callout-title">Warning</div><p><strong>本次运行的环境限制（如实记录）</strong></p>
+<ul><li>学术 API（arXiv / Semantic Scholar / OpenAlex）被环境网络策略拦截（CONNECT 403）。文献检索全部通过 WebSearch 完成（4 个分片，约 160 次查询）。<code>verify_papers.py</code> 的三层校验无法运行：表中论文都在检索结果里出现过并附了链接，但<strong>状态为 ⚠️ UNVERIFIED（verification unavailable）</strong>，数字均为摘要/摘要片段中的声称值。2026 年的高编号预印本（2606–2610）尤其需要在引用前到 arXiv 上复核。</li><li>没有 Codex MCP（<code>codex</code> CLI 未安装、未登录）、没有 Gemini CLI。ARIS 要求的<strong>跨模型家族评审无法执行</strong>。triage、新颖性复核、外部评审改由<strong>上下文独立的 Claude 子代理</strong>完成，属于同家族评审，不能作为 ARIS 的 acceptance receipt。</li><li>没有 GPU，Phase 5 pilot 全部 <strong>SKIPPED: needs GPU</strong>。</li></ul></div>
+<h2 id="executive-summary">Executive Summary</h2>
+<p><strong>最佳 idea</strong>：<strong>C1+C5 "压缩吃掉冗余"</strong>。检验长度惩罚 RL（ThinkPrune / L1 / AdaptThink / LC-R1）是否删掉了投机解码和 KV 驱逐赖以生效的冗余：在投机解码下，token 数压缩是否高估了 wall-clock 节省？随机驱逐在压缩后的 trace 上是否不再免费？新颖性 7/10（PROCEED），独立评审给 PROCEED（模拟分 5→6/10）。完全基于公开 checkpoint 做推理，第一个闸门实验只需约 1.5 GPU-h，正反结果都能发表。<strong>备选</strong>：C2，检验 Thinking MLLM 是否对 prefill 视觉 token 剪枝更脆弱（6/10，PROCEED）。<strong>淘汰</strong>：C4（混合架构 KV 驱逐），模型上下文长度不够、收益小，且已被同期工作占据。<strong>下一步</strong>：在有 GPU 的环境中跑 C1 的 P0 判别实验（位置匹配 + 固定窗口的 n-gram τ）；同时配置 Codex 跨模型评审，补齐 ARIS 的 acceptance receipt（本次评审都是同家族 Claude，evidence gate 为 BLOCKED，见文末）。</p>
+<p><a id="literature-landscape"></a></p>
+<h2 id="literature-landscape">Literature Landscape</h2>
+<p>4 个 WebSearch 文献分片，共约 160 次查询，带链接的论文约 150 篇：1.A MLLM token 效率、1.B KV cache 与长上下文、1.C 量化 / 剪枝 / MoE、1.D 解码加速与高效推理。下面先给跨方向综合，再列各分片的论文表、空白和饱和度判断。所有数字均为摘要中的声称值，状态为 UNVERIFIED。</p>
+<h3 id="0-跨方向综合四个分片共同指向的结构性规律">0. 跨方向综合（四个分片共同指向的结构性规律）</h3>
+<ol><li><strong>"随机基线"危机遍布各子方向。</strong> 视觉 token 剪枝里，random/pooling/下采样常常打平或胜过精心设计的打分（2502.11501, VTC-Bench 2510.07143, UniPruneBench 2511.02650, Worse-than-Random 2512.07580）。KV 驱逐里，对推理轨迹做随机驱逐约等于最强的 evictor（Random Attention 2609.03430）。<em>[评审修正]</em> 两个子方向给出的原因不同。视觉 token 方面，主要归因于 benchmark 区分度不足和位置偏差；decode KV 方面，Random Attention 归因于"保护 prompt + 逐头冗余 + 模型会复述它仍需要的内容"。所谓"统一的 regime 理论"目前只是假设，不是已有发现。<strong>方法论缺口</strong>：一个能预测"打分何时比随机有用"的诊断。</li><li><strong>decode-heavy 的长推理 regime 正在打破 prefill 时代的效率假设。</strong> 量化后的推理模型想得更久（2606.00206），剪枝会让 TTS 崩掉（2510.22228），剪枝后的模型输出更长（2509.12464），视觉相关性在解码中途会漂移（DSTP 2604.12358），CoT SFT 会抹掉混合架构的长程召回（Attention Amnesia 2606.11052）。大多数方法是在输入重建 / prefill 上校准的。</li><li><strong>组合效应几乎没人测。</strong> CoT 压缩 × 投机解码、量化 × token 剪枝（QAPruner 2604.02816 是唯一的警告）、MLA 转换 × 量化 × 驱逐、量化 × 剪枝 × 激活稀疏：各自的论文都声称"正交"，没人检验误差是加性、超加性还是相互抵消。</li><li><strong>代价核算单位不对。</strong> FLOPs、token 数、压缩率被当作代理指标；但真实部署中，验证开销、batching、prefix caching、FlashAttention 兼容性、显存访问才决定 wall-clock（Kinetics 2506.05333, SD Performance-or-Illusion 2601.11580, FlashVLM 2512.20561, 2607.05399）。把 bits × tokens × latency 合在一起的"cost per solved problem"仍然少见。<em>[评审修正：原先写"没人报"，说得太强。Kinetics 和 OckBench 已经报告了基于代价的效率；而且 Kinetics 的"注意力 / 显存读取主导代价"会<strong>反向</strong>影响 C1 的头条结论：trace 变短本身会让每个 token 更便宜。]</em></li><li><strong>后训练会改变效率相关的性质。</strong> RL / CoT SFT 会改变量化敏感度、置信度校准（early exit 依赖它）、长程注意力（稀疏/混合架构依赖它），以及可投机性（drafter 依赖它）。这些影响几乎都没被测量过。</li></ol>
+<p><strong>过度拥挤（避免）</strong>：又一个 LLaVA-1.5 上的无训练视觉 token 打分准则；离线视频 token 合并；W4A4 rotation 在 LLaMA PPL 上抠小数点；长度惩罚 RL 用在 R1-Distill-1.5B 数学上；attention-score KV 驱逐在 LongBench 上刷分；dLLM 缓存小技巧；EAGLE 式 drafter 微调。 <strong>欠探索（机会）</strong>：解码期 / 推理期动态；组合效应；wall-clock 与服务栈层面的评测；后训练对效率性质的侵蚀；混合架构里少量 softmax 层的 KV 压缩；压缩 × TTS 曲线（pass@k）；"何时打分优于随机"的 regime 诊断。</p>
+<h3 id="1a-mllm--video-llm--vla-token-efficiency">1.A MLLM / Video-LLM / VLA token efficiency</h3>
+<table><thead><tr><th>Paper (arXiv)</th><th>Year/Venue</th><th>Method</th><th>Key claimed result</th><th>URL</th></tr></thead><tbody><tr><td>FastV (2403.06764)</td><td>ECCV'24</td><td>Prune visual tokens after layer K by early-layer attention</td><td>~45% FLOPs cut on LLaVA-1.5-13B</td><td>https://arxiv.org/abs/2403.06764</td></tr><tr><td>LLaVA-PruMerge (2403.15388)</td><td>2024</td><td>[CLS]-attention keep + merge dropped tokens</td><td>Claim changed across versions (14.4x → 4x)</td><td>https://arxiv.org/abs/2403.15388</td></tr><tr><td>Matryoshka MM (M3) (2405.17430)</td><td>ICLR'25</td><td>Nested coarse-to-fine visual tokens</td><td>~9 tokens ≈ 576 on COCO-style; large oracle gap</td><td>https://arxiv.org/abs/2405.17430</td></tr><tr><td>SparseVLM (2410.04417)</td><td>2024</td><td>Text-guided layer-adaptive pruning + recycling</td><td>~4.5x compression at ~97%</td><td>https://arxiv.org/abs/2410.04417</td></tr><tr><td>LongVU (2410.17434)</td><td>ICML'25</td><td>DINOv2 dedup + query frame selection</td><td>Hour-long video gains</td><td>https://arxiv.org/abs/2410.17434</td></tr><tr><td>VisionZip (2412.04467)</td><td>CVPR'25</td><td>Dominant + contextual tokens at encoder output</td><td>8x faster prefill</td><td>https://arxiv.org/abs/2412.04467</td></tr><tr><td>Feather the Throttle (2412.13180)</td><td>ICCV'25</td><td>Critique: FastV drops top-of-image tokens due to RoPE</td><td>&gt;5x better localization than FastV</td><td>https://arxiv.org/abs/2412.13180</td></tr><tr><td>FastVLM (2412.13303)</td><td>CVPR'25</td><td>Hybrid encoder emits fewer high-res tokens</td><td>85x faster TTFT vs LLaVA-OV at 1152px</td><td>https://arxiv.org/abs/2412.13303</td></tr><tr><td>LLaVA-Mini (2501.03895)</td><td>ICLR'25</td><td>Modality pre-fusion → 1 vision token</td><td>Beats LLaVA-1.5 with 1 vs 576 tokens</td><td>https://arxiv.org/abs/2501.03895</td></tr><tr><td>DART (2502.11494)</td><td>EMNLP'25</td><td>Keep tokens least similar to pivots (duplication)</td><td>88.9% pruned, 1.99x speedup</td><td>https://arxiv.org/abs/2502.11494</td></tr><tr><td>Are We Solving the Right Problem? (2502.11501)</td><td>ACL-F'25</td><td>Analysis: random/pooling vs importance pruning</td><td>Many methods fail to beat random</td><td>https://arxiv.org/abs/2502.11501</td></tr><tr><td>AirCache (2503.23956)</td><td>2025</td><td>Text-to-vision relevance KV compression</td><td>Full-cache quality at 10% visual KV</td><td>https://arxiv.org/abs/2503.23956</td></tr><tr><td>HoliTom (2505.21334)</td><td>2025</td><td>Global temporal segmentation + merging</td><td>99.1% perf at 6.9% FLOPs</td><td>https://arxiv.org/abs/2505.21334</td></tr><tr><td>EfficientVLA (2506.10100)</td><td>NeurIPS'25</td><td>Layer skip + diverse tokens + action-head cache</td><td>1.93x on CogACT</td><td>https://arxiv.org/abs/2506.10100</td></tr><tr><td>InfiniPot-V (2506.15745)</td><td>NeurIPS'25</td><td>Fixed-budget KV for streaming video</td><td>Flat memory, 3.6x at 500 s</td><td>https://arxiv.org/abs/2506.15745</td></tr><tr><td>GAP (2506.21873)</td><td>2025</td><td>Grounding collapse = misaligned position IDs</td><td>RefCOCO 56.1 → 15.3 under pruning; GAP recovers</td><td>https://arxiv.org/abs/2506.21873</td></tr><tr><td>VisionThink (2507.13348)</td><td>NeurIPS'25</td><td>RL: start at 1/4 res, request full res</td><td>OCR needs full res; VQA does not</td><td>https://arxiv.org/abs/2507.13348</td></tr><tr><td>VTC-Bench (2510.07143)</td><td>ACL'26</td><td>Split benchmarks into simple/hard via downsampling</td><td>Plain downsampling beats many methods</td><td>https://arxiv.org/abs/2510.07143</td></tr><tr><td>UniPruneBench (2511.02650)</td><td>2025</td><td>10 methods × 6 abilities × 3 backbones + latency</td><td>Random strong; OCR most sensitive</td><td>https://arxiv.org/abs/2511.02650</td></tr><tr><td>VLA-Pruner (2511.16449)</td><td>2025</td><td>Semantic + temporally smoothed action relevance</td><td>Up to 1.99x</td><td>https://arxiv.org/abs/2511.16449</td></tr><tr><td>When Token Pruning is Worse than Random (2512.07580)</td><td>CVPR'26</td><td>"Information horizon" layer</td><td>Past ~layer 20 methods ≈ random; horizon deeper for stronger models</td><td>https://arxiv.org/abs/2512.07580</td></tr><tr><td>D2Pruner (2512.19443)</td><td>2025</td><td>Debiased importance + diversity</td><td>Bias direction depends on PE type</td><td>https://arxiv.org/abs/2512.19443</td></tr><tr><td>FlashVLM (2512.20561)</td><td>2025</td><td>One-shot text-guided selection at encoder boundary, FA-compatible</td><td>313 → 74 ms vs FastV 112 ms</td><td>https://arxiv.org/abs/2512.20561</td></tr><tr><td>IVC-Prune (2602.03060)</td><td>ICLR'26</td><td>Keep implicit spatial-coordinate tokens</td><td>≥99% at 50%; much better grounding</td><td>https://arxiv.org/abs/2602.03060</td></tr><tr><td>FlashVID (2602.08024)</td><td>2026</td><td>Tree-based spatiotemporal merging</td><td>99.1% at 10% tokens</td><td>https://arxiv.org/abs/2602.08024</td></tr><tr><td>ReDiPrune (2603.24680)</td><td>2026</td><td>Pre-projector relevance + diversity</td><td>+2.0 EgoSchema at 15% tokens</td><td>https://arxiv.org/abs/2603.24680</td></tr><tr><td>DSTP (2604.12358)</td><td>ECCV'26</td><td>Relevant visual tokens shift during decoding</td><td>Static pruning fails on complex reasoning</td><td>https://arxiv.org/abs/2604.12358</td></tr><tr><td>LLaVA-UHD v4 (2605.08985)</td><td>2026</td><td>Early in-ViT compression for high-res</td><td>−55.8% encoding FLOPs</td><td>https://arxiv.org/abs/2605.08985</td></tr><tr><td>KVCapsule (2605.16439)</td><td>2026</td><td>Compress visual KV, rebuild before attention</td><td>Tracks shifting importance</td><td>https://arxiv.org/abs/2605.16439</td></tr><tr><td>TOPS (2606.27161)</td><td>2026</td><td>Info-theoretic preservation set</td><td>~100% at −77.8% tokens (LLaVA-NeXT); ~92% at 90% on Qwen2.5-VL</td><td>https://arxiv.org/abs/2606.27161</td></tr><tr><td>Bifocal (2610.18399)</td><td>Oct 2026</td><td>Split budget image-driven vs question-driven</td><td>At 1/3 tokens general OK, grounding lost</td><td>https://arxiv.org/abs/2610.18399</td></tr><tr><td>VLA-ACL (2610.08133)</td><td>Oct 2026</td><td>Action-supervised pruning policy</td><td>87.5% pruned, 1.5x</td><td>https://arxiv.org/abs/2610.08133</td></tr><tr><td>CrisPrune</td><td>ACL-F'26</td><td>Contextual relevance + intrinsic saliency</td><td>13x FLOPs, 97% kept</td><td>https://aclanthology.org/2026.findings-acl.663/</td></tr></tbody></table>
+<p>Also seen (2026 "*Prune" wave): SinkPruner 2609.01004, EntropyPrune 2602.17196, QCPruner 2609.19990, ET-Prune 2608.01979, IDPruner 2602.13315, RoRA 2608.07088, Layer-Aware PE 2609.23715; video: OTT-Vid 2605.11803, EarlyTom 2605.30010, Visual Token Coding 2608.28008; streaming: StreamMem 2508.15717, LiveVLM 2505.15269, StreamKV 2511.07278; unified models: FlashU 2603.15271, CE-Router 2608.29291; video CoT × compression 2512.09616.</p>
+<p><strong>Landscape.</strong> Training-free image token pruning dominates; the criterion moved from attention-importance (FastV, SparseVLM) to duplication/coverage (DART, DivPrune, CDPruner, TOPS) after early-2025 analyses showed importance pruning often loses to random. Attention scores carry position bias and are FlashAttention-incompatible, so selection is moving to the encoder boundary. A strong critique literature (VTC-Bench, UniPruneBench, Worse-than-Random, Bifocal, GAP, DSTP) indicates that the "~90% pruned at ~97–100% kept" headline numbers mostly live on benchmarks that cannot separate methods; OCR, grounding and multi-step reasoning break first. Video splits into offline spatiotemporal merging (crowded, all "99% at 7–10%") and streaming fixed-size KV memory. High-res efficiency shifts to cheaper encoders / in-ViT compression; VLA and unified models are new, less mature settings (1.5–2x speedups).</p>
+<p><strong>Gaps.</strong></p>
+<ol><li>[contradiction] Direction/cause of position bias disagrees across papers; no controlled PE study (absolute vs 1D-RoPE vs M-RoPE) at a fixed backbone.</li><li>[untested-assumption] Pruning once at prefill assumes fixed relevance; DSTP shows it shifts. Untested on long-CoT "thinking" MLLMs (Qwen3-VL-Thinking etc.) where evidence may be needed late.</li><li>[diagnostic] Benchmark validity: no stress suite where full-token ≫ low-res/random.</li><li>[scaling-regime] Prunability may shrink with stronger / native-resolution backbones; no retention-vs-backbone-strength curve.</li><li>[diagnostic] FLOPs vs real latency under continuous batching / prefix caching unmeasured.</li><li>[method-transfer] Position-ID bookkeeping (GAP, IVC-Prune) may explain many grounding failures; untested across earlier methods.</li><li>[untested-assumption] Post-encoder pruning ignores encoder cost dominating TTFT at high res/video; no joint budget across ViT/projector/LLM.</li><li>[contradiction] Trained extreme compressors (LLaVA-Mini 1 token, M3) vs fine-grained needs; never evaluated on hard subsets.</li><li>[method-transfer] Streaming bounded KV memory not brought to long-horizon closed-loop VLA.</li><li>[diagnostic] Side effects (hallucination, safety, calibration) of pruning barely measured.</li><li>[scaling-regime] Unified und+gen and audio-visual models barely studied.</li><li>[contradiction] When does query-agnostic coverage beat query relevance?</li></ol>
+<p><strong>Saturation.</strong> Overcrowded: another scoring criterion for training-free image pruning on LLaVA-1.5 (20+ such 2026 papers); offline video merging. Under-explored: decode-time / reasoning-time visual-token dynamics; serving-level evaluation; PE/position-ID diagnostics; hard-subset benchmarks; VLA memory; prunability scaling.</p>
+<h3 id="1b-kv-cache--long-context-efficiency">1.B KV cache &amp; long-context efficiency</h3>
+<table><thead><tr><th>Paper (arXiv)</th><th>Year/Venue</th><th>Method</th><th>Key claimed result</th><th>URL</th></tr></thead><tbody><tr><td>H2O (2306.14048)</td><td>NeurIPS'23</td><td>Recent + heavy-hitter tokens</td><td>Up to 29x throughput</td><td>https://arxiv.org/abs/2306.14048</td></tr><tr><td>StreamingLLM (2309.17453)</td><td>ICLR'24</td><td>Attention sinks + window</td><td>Stable to 4M tokens; no long-range recall</td><td>https://arxiv.org/abs/2309.17453</td></tr><tr><td>SnapKV (2404.14469)</td><td>NeurIPS'24</td><td>Observation-window voting per head</td><td>3.6x speed, 8.2x memory at 16K</td><td>https://arxiv.org/abs/2404.14469</td></tr><tr><td>PyramidKV (2406.02069)</td><td>COLM'25</td><td>Depth-decreasing layer budget</td><td>Full-KV LongBench at 12% cache</td><td>https://arxiv.org/abs/2406.02069</td></tr><tr><td>Ada-KV (2407.11550)</td><td>NeurIPS'25</td><td>Adaptive per-head budget</td><td>Improves SnapKV/PyramidKV</td><td>https://arxiv.org/abs/2407.11550</td></tr><tr><td>DefensiveKV (2510.13334)</td><td>ICLR'26</td><td>Worst-case score aggregation</td><td>2.3–4.3x lower loss at 20% cache</td><td>https://arxiv.org/abs/2510.13334</td></tr><tr><td>Quest (2406.10774)</td><td>ICML'24</td><td>Query-aware page selection via min/max key bounds</td><td>7.03x attention speedup</td><td>https://arxiv.org/abs/2406.10774</td></tr><tr><td>DuoAttention (2410.10819)</td><td>ICLR'25</td><td>Full KV only on retrieval heads</td><td>2.55x (MHA) / 1.67x (GQA) memory</td><td>https://arxiv.org/abs/2410.10819</td></tr><tr><td>KVzip (2505.23416)</td><td>NeurIPS'25</td><td>Query-agnostic eviction by context reconstruction</td><td>Query-aware methods degrade under reuse</td><td>https://arxiv.org/abs/2505.23416</td></tr><tr><td>RestoreKV (2608.01247)</td><td>2026</td><td>Restore cache on top of query-agnostic eviction</td><td>KVzip 38.2 → 73.2 on RULER-4K at 5%</td><td>https://arxiv.org/abs/2608.01247</td></tr><tr><td>KIVI (2402.02750)</td><td>ICML'24</td><td>2-bit asymmetric KV quant</td><td>2.6x less peak memory</td><td>https://arxiv.org/abs/2402.02750</td></tr><tr><td>TurboQuant (2504.19874)</td><td>ICLR'26</td><td>Random rotation + optimal scalar quant + 1-bit QJL residual</td><td>Quality-neutral at 3.5 bits/channel</td><td>https://arxiv.org/abs/2504.19874</td></tr><tr><td>Palu (2407.21118)</td><td>ICLR'25</td><td>Low-rank K/V projection latents</td><td>1.89x at 50% compression</td><td>https://arxiv.org/abs/2407.21118</td></tr><tr><td>MHA2MLA (2502.14837)</td><td>ACL'25</td><td>MHA→MLA via partial-RoPE + joint SVD</td><td>−92% KV, ~0.5–1% LongBench drop; VLM variant 2601.11464</td><td>https://arxiv.org/abs/2502.14837</td></tr><tr><td>TransMLA (2502.07864)</td><td>2025</td><td>GQA exactly representable as MLA</td><td>~93% KV compression</td><td>https://arxiv.org/abs/2502.07864</td></tr><tr><td>MInference (2407.02490)</td><td>NeurIPS'24</td><td>Per-head offline sparse patterns for prefill</td><td>Successors FlexPrefill, XAttention (13.5x at 256K)</td><td>https://arxiv.org/abs/2407.02490</td></tr><tr><td>NSA (2502.11089)</td><td>ACL'25</td><td>Natively trainable hardware-aligned sparse attention</td><td>≥ full attention; 64K speedups</td><td>https://arxiv.org/abs/2502.11089</td></tr><tr><td>MoBA (2502.13189)</td><td>NeurIPS'25</td><td>MoE-style block routing</td><td>Deployed at Kimi</td><td>https://arxiv.org/abs/2502.13189</td></tr><tr><td>DeepSeek-V3.2 DSA (2512.02556)</td><td>2025</td><td>Lightning indexer + top-k token selection</td><td>~parity with dense V3.1</td><td>https://arxiv.org/abs/2512.02556</td></tr><tr><td>SeerAttention-R (2506.08889)</td><td>ICLR'26</td><td>Learned gate block-sparse decode for reasoning</td><td>Near-full AIME at 4K budget</td><td>https://arxiv.org/abs/2506.08889</td></tr><tr><td>The Sparse Frontier (2504.17768)</td><td>ACL-F'26</td><td>isoFLOPS study of training-free sparse attention</td><td>Decode tolerates more sparsity; optimal sparsity grows with length</td><td>https://arxiv.org/abs/2504.17768</td></tr><tr><td>MiniMax-01 (2501.08313)</td><td>2025</td><td>7:1 lightning/softmax hybrid MoE</td><td>1M training context</td><td>https://arxiv.org/abs/2501.08313</td></tr><tr><td>Kimi Linear (2510.26692)</td><td>2025</td><td>KDA (gated DeltaNet) 3:1 with MLA</td><td>−75% KV, 6x decode at 1M</td><td>https://arxiv.org/abs/2510.26692</td></tr><tr><td>Mamba in the Llama (2408.15237)</td><td>NeurIPS'24</td><td>Distill Transformer → Mamba hybrid</td><td>≈ teacher with 1/4 attention</td><td>https://arxiv.org/abs/2408.15237</td></tr><tr><td>HALO / HypeNet (2601.22156)</td><td>ICML'26</td><td>Transformer → hybrid distillation with layer selection</td><td>Qwen3 conversion with 2.3B tokens</td><td>https://arxiv.org/abs/2601.22156</td></tr><tr><td>Attention Amnesia (2606.11052)</td><td>2026</td><td>CoT SFT breaks hybrid long-range recall</td><td>NIAH 67.2 → 9.4 after CoT SFT</td><td>https://arxiv.org/abs/2606.11052</td></tr><tr><td>ShadowKV (2410.21465)</td><td>2024</td><td>Low-rank K on GPU, V offloaded</td><td>3.04x throughput</td><td>https://arxiv.org/abs/2410.21465</td></tr><tr><td>SCBench (2412.10319)</td><td>ICLR'25</td><td>KV-lifecycle multi-turn benchmark</td><td>Sub-O(n) methods fail multi-turn</td><td>https://arxiv.org/abs/2412.10319</td></tr><tr><td>Query-visibility audit (2607.11942)</td><td>2026</td><td>Matched-budget audit of query visibility</td><td>Query-aware advantage mostly from seeing the question</td><td>https://arxiv.org/abs/2607.11942</td></tr><tr><td>KVDiagnosis (2608.09412)</td><td>2026</td><td>Per-failure diagnostic benchmark</td><td>10 diagnostics, AUROC 0.68–0.87</td><td>https://arxiv.org/abs/2608.09412</td></tr><tr><td>KV benchmark quality+systems (2607.05399)</td><td>2026</td><td>Quality + throughput + TTFT</td><td>Compression ratio poor predictor of e2e</td><td>https://arxiv.org/abs/2607.05399</td></tr><tr><td>R-KV (2505.24133)</td><td>NeurIPS'25</td><td>Redundancy-aware eviction for long CoT</td><td>Near-full at 10% KV</td><td>https://arxiv.org/abs/2505.24133</td></tr><tr><td>DMS (2506.05345)</td><td>NeurIPS'25</td><td>Delayed eviction to buy more tokens per memory</td><td>+9.1 AIME24 at matched memory</td><td>https://arxiv.org/abs/2506.05345</td></tr><tr><td>Random Attention (2609.03430)</td><td>2026</td><td>Protect prompt, random-evict decode KV</td><td>≈ strongest evictor; +32–43% vLLM throughput</td><td>https://arxiv.org/abs/2609.03430</td></tr><tr><td>Sparse-RL (2601.10079)</td><td>2026</td><td>KV-compressed RL rollouts with mismatch correction</td><td>−35–53% stored KV</td><td>https://arxiv.org/abs/2601.10079</td></tr></tbody></table>
+<p>Also seen: reasoning eviction ForesightKV 2602.03203, KV-Rescue 2608.15797, AvoKV-E 2610.03007, RLKV 2510.08525, LongFlow 2603.11504, CapKV 2604.25975; RL rollouts Shadow Mask Distillation 2605.06850, S3R 2610.13202; hybrids "When Perplexity Lies" 2603.26556, Opal 2609.31947, DeltaS 2609.27470 (hybrid video eviction via linear state); multimodal KV RetentiveKV 2605.04075; serving Mooncake 2407.00079, CacheBlend 2405.16444.</p>
+<p><strong>Landscape.</strong> Eviction grew from H2O/StreamingLLM → SnapKV → layer/head budgets → refined scoring rules (CriticalKV, DefensiveKV). The query-aware vs query-agnostic split matters: KVzip, RestoreKV and the query-visibility audit show query-aware results are inflated whenever caches are reused. The decode-heavy reasoning regime is the 2025–26 hot spot (R-KV, DMS, SeerAttention-R, 10+ preprints), but Random Attention claims random eviction of trace KV matches the best scorers. Representation compression is converging on learned/architectural solutions (TurboQuant; MHA/GQA→MLA conversion; NSA/MoBA/DSA in production). Hybrid linear/softmax architectures are now mainstream (MiniMax-01, Qwen3-Next, Kimi Linear) with a growing Transformer→hybrid distillation literature, and Attention Amnesia warns CoT SFT can wipe hybrid recall. Evaluation critique (SCBench, KVDiagnosis, 2607.05399) agrees aggregate scores and compression ratios mislead.</p>
+<p><strong>Gaps.</strong></p>
+<ol><li>[untested-assumption] KV eviction on the few softmax layers of hybrid text models — <em>[stale; corrected at novelty check: GateSight 2610.14754, HeadWiseKV 2609.02029, 2605.18053 now cover it as methods/side observations; see Novelty Verification]</em>.</li><li>[contradiction] Random Attention vs scoring refinement — likely a prompt-heavy vs decode-heavy regime boundary.</li><li>[diagnostic] Reasoning-eviction methods never re-ranked under multi-turn agentic reuse with query hidden.</li><li>[method-transfer] DSA-style distilled lightning indexer as retrieval scorer for offloading in existing GQA models.</li><li>[untested-assumption] Does reasoning post-training erode long-range attention in NSA/DSA indexers, MLA-converted models, Sparse-RL policies?</li><li>[scaling-regime] Length-adaptive budget schedules for 100K+ token decode.</li><li>[contradiction] Do latent conversion + eviction + quantization stack?</li><li>[diagnostic] Do NIAH/RULER deltas predict real-task deltas under compression?</li><li>[method-transfer] R-KV / DMS reasoning-trace methods to long-video KV.</li><li>[scaling-regime] Eviction vs prefix sharing under continuous batching.</li><li>[untested-assumption] Stability of hybrid layer selection across lengths and post-training.</li><li>[diagnostic] Do sparse RL rollouts shift learned behavior (length, retrieval)?</li></ol>
+<p><strong>Saturation.</strong> Overcrowded: attention-score eviction on LongBench/RULER; training-free prefill sparse patterns; 2026 reasoning-model eviction on AIME/MATH. Under-explored: hybrid-model KV compression; composition; agentic reuse evaluation; post-training effects on efficient architectures; length-adaptive budgets; learned indexers for offloading.</p>
+<h3 id="1c-model-compression-quantization-pruningsparsity-moe">1.C Model compression: quantization, pruning/sparsity, MoE</h3>
+<table><thead><tr><th>Paper (arXiv)</th><th>Year/Venue</th><th>Method</th><th>Key claimed result</th><th>URL</th></tr></thead><tbody><tr><td>AWQ (2306.00978)</td><td>MLSys'24</td><td>Activation-aware per-channel scaling protects ~1% salient weights</td><td>Weight-only 4-bit, no backprop</td><td>https://arxiv.org/abs/2306.00978</td></tr><tr><td>SparseGPT (2301.00774)</td><td>ICML'23</td><td>One-shot OBS-style pruning</td><td>50–60% sparsity on 175B, 2:4 support</td><td>https://arxiv.org/abs/2301.00774</td></tr><tr><td>QuaRot (2404.00456)</td><td>NeurIPS'24</td><td>Hadamard rotations remove outliers → W4A4KV4</td><td>LLaMA2-70B ≤0.47 PPL loss</td><td>https://arxiv.org/abs/2404.00456</td></tr><tr><td>SpinQuant (2405.16406)</td><td>ICLR'25</td><td>Learned (Cayley) rotations</td><td>W4A4KV4 within 2.9 pts of FP</td><td>https://arxiv.org/abs/2405.16406</td></tr><tr><td>FlatQuant (2410.09426)</td><td>ICML'25</td><td>Learned per-layer Kronecker affine transforms</td><td>W4A4 LLaMA-3-70B &lt;1% drop; 2.3x prefill</td><td>https://arxiv.org/abs/2410.09426</td></tr><tr><td>ReSpinQuant (2604.11080)</td><td>2026</td><td>Subspace residual rotations</td><td>L3-8B W4A4 PPL 7.24 vs 7.50 SpinQuant</td><td>https://arxiv.org/abs/2604.11080</td></tr><tr><td>QTIP (2406.11235)</td><td>NeurIPS'24</td><td>Trellis-coded VQ at 2–4 bits</td><td>Beats QuIP#/AQLM</td><td>https://arxiv.org/abs/2406.11235</td></tr><tr><td>Scaling Laws for Precision (2411.04330)</td><td>ICLR'25</td><td>Loss vs train/inference precision</td><td>PTQ degradation grows with data; over-training hurts PTQ</td><td>https://arxiv.org/abs/2411.04330</td></tr><tr><td>Low-Bit Favors Undertrained LLMs (2411.17691)</td><td>ACL'25</td><td>QiD over 1500+ checkpoints</td><td>100T-token models projected to quantize poorly</td><td>https://arxiv.org/abs/2411.17691</td></tr><tr><td>Scaling FP8 Training (2409.12517)</td><td>ICLR'25</td><td>FP8 to 2T tokens, Smooth-SwiGLU</td><td>Matches BF16, ~34% faster</td><td>https://arxiv.org/abs/2409.12517</td></tr><tr><td>NVFP4 Pretraining (2509.25149)</td><td>2025</td><td>NVFP4 (block 16) + RHT pretraining</td><td>MXFP4 needs +36% tokens vs NVFP4</td><td>https://arxiv.org/abs/2509.25149</td></tr><tr><td>Quartet (2505.14669)</td><td>2025</td><td>Native MXFP4 training of all matmuls</td><td>~2x linear throughput vs FP8</td><td>https://arxiv.org/abs/2505.14669</td></tr><tr><td>BitNet b1.58 2B4T (2504.12285)</td><td>2025</td><td>Native ternary 2B trained on 4T tokens</td><td>≈ FP peers at same size</td><td>https://arxiv.org/abs/2504.12285</td></tr><tr><td>ParetoQ (2502.02631)</td><td>2025</td><td>Unified QAT across 1–4 bits</td><td>Learning transition between 2 and 3 bits</td><td>https://arxiv.org/abs/2502.02631</td></tr><tr><td>Quantization Hurts Reasoning? (2504.04823)</td><td>COLM'25</td><td>PTQ study on R1-distilled / QwQ</td><td>W8A8, W4A16 ≈ lossless; lower bits risky</td><td>https://arxiv.org/abs/2504.04823</td></tr><tr><td>Quantized Reasoning Models Think Longer (2606.00206)</td><td>2026</td><td>Diagnoses overthinking under quantization; logit penalty</td><td>3-bit AWQ overthinking errors ×7.3</td><td>https://arxiv.org/abs/2606.00206</td></tr><tr><td>QaRL (2604.07853)</td><td>ACL-F'26</td><td>Low-bit rollouts + aligned learner</td><td>+5.5 over quantized-rollout RL</td><td>https://arxiv.org/abs/2604.07853</td></tr><tr><td>TRACE (2610.07767)</td><td>Oct 2026</td><td>FP4 QAT aligned to FP4 rollouts for MoE RL</td><td>~BF16 RL, 5.4x rollout speedup</td><td>https://arxiv.org/abs/2610.07767</td></tr><tr><td>MQuant (2502.00425)</td><td>ACM MM'25</td><td>Modality-specific static scales for MLLM PTQ</td><td>W4A8 &lt;1% drop</td><td>https://arxiv.org/abs/2502.00425</td></tr><tr><td>LUQ (2509.23729)</td><td>2025</td><td>Layer-wise sub-4-bit MLLM quantization</td><td>Visual tokens have higher activation entropy</td><td>https://arxiv.org/abs/2509.23729</td></tr><tr><td>RAC (2509.12464)</td><td>ICLR'26</td><td>Calibrate SparseGPT on self-generated CoT traces</td><td>95% acc at 50% sparsity on reasoning</td><td>https://arxiv.org/abs/2509.12464</td></tr><tr><td>When Fewer Layers Break More Chains (2510.22228)</td><td>COLM'26</td><td>Layer pruning vs long reasoning / TTS</td><td>Removing 1–2 layers collapses TTS</td><td>https://arxiv.org/abs/2510.22228</td></tr><tr><td>Doing More With Less (2604.25098)</td><td>2026</td><td>Pruning under test-time scaling</td><td>Unstructured beats structured, sometimes beats dense</td><td>https://arxiv.org/abs/2604.25098</td></tr><tr><td>ShortGPT (2403.03853)</td><td>ACL-F'25</td><td>Block-Influence layer removal</td><td>—</td><td>https://arxiv.org/abs/2403.03853</td></tr><tr><td>Unreasonable Ineffectiveness of Deeper Layers (2403.17887)</td><td>ICLR'25</td><td>Prune layer block + QLoRA heal</td><td>~half layers removable on QA</td><td>https://arxiv.org/abs/2403.17887</td></tr><tr><td>Minitron (2407.14679)</td><td>NeurIPS'24</td><td>Prune + KD retrain</td><td>40x fewer tokens than scratch</td><td>https://arxiv.org/abs/2407.14679</td></tr><tr><td>TEAL (2408.14690)</td><td>ICLR'25</td><td>Training-free magnitude activation sparsity</td><td>1.53–1.8x decode at 40–50%</td><td>https://arxiv.org/abs/2408.14690</td></tr><tr><td>Polar Sparsity (2505.14884)</td><td>2025</td><td>Batched contextual sparsity on heads</td><td>MLP sparsity vanishes under batching</td><td>https://arxiv.org/abs/2505.14884</td></tr><tr><td>Universal Props of Activation Sparsity (2509.00454)</td><td>2025</td><td>Cross-model activation-sparsity study</td><td>Realistic speedups ~1.3–1.5x</td><td>https://arxiv.org/abs/2509.00454</td></tr><tr><td>To 2:4 Sparsity and Beyond (2602.06183)</td><td>2026</td><td>2:4 W + v:n:m A sparsity in pretraining</td><td>1.4–1.7x training speedup</td><td>https://arxiv.org/abs/2602.06183</td></tr><tr><td>REAP (2510.13999)</td><td>ICLR'26</td><td>Expert pruning by gate×activation norm</td><td>~lossless 50% expert pruning on 480B</td><td>https://arxiv.org/abs/2510.13999</td></tr><tr><td>REAM (2604.04356)</td><td>2026</td><td>Group-and-merge experts</td><td>Merging often beats REAP; calibration-dependent</td><td>https://arxiv.org/abs/2604.04356</td></tr><tr><td>MoBiLE (2510.12357)</td><td>2025</td><td>Offloaded MoE, halve experts for unimportant tokens</td><td>1.6–1.7x on consumer GPU</td><td>https://arxiv.org/abs/2510.12357</td></tr><tr><td>Expert-Sample (2602.02443)</td><td>2026</td><td>Dynamic top-k for fine-grained MoE</td><td>Halving experts keeps greedy acc but hurts pass@n</td><td>https://www.alphaxiv.org/abs/2602.02443</td></tr><tr><td>Expert-wise MoE Quant (2604.06515)</td><td>2026</td><td>Per-expert bit allocation</td><td>Sub-3-bit uniform hurts; per-expert barely explored</td><td>https://arxiv.org/abs/2604.06515</td></tr><tr><td>Upcycling scaling laws (2502.03009)</td><td>ICML'25</td><td>When dense→MoE upcycling pays</td><td>Budget conditions</td><td>https://arxiv.org/abs/2502.03009</td></tr><tr><td>ACBench (2505.19433)</td><td>ICML'25</td><td>Agentic benchmark for compressed LLMs</td><td>Real-world app accuracy −10–15% at 4-bit</td><td>https://arxiv.org/abs/2505.19433</td></tr><tr><td>Accuracy is Not All You Need (2407.09141)</td><td>NeurIPS'24</td><td>Flip-rate / KL metrics</td><td>≤2% acc change but up to 13.6% flips</td><td>https://arxiv.org/abs/2407.09141</td></tr><tr><td>Quantization on Long-Context (2505.20276)</td><td>EMNLP'25</td><td>Quant eval at &gt;64K</td><td>4-bit drops up to 59%</td><td>https://arxiv.org/abs/2505.20276</td></tr><tr><td>Fairness &amp; Safety in Quantized LLMs (2601.12033)</td><td>ACL-F'26</td><td>Safety under quantization</td><td>Safety degrades, worst in KO/AR</td><td>https://arxiv.org/abs/2601.12033</td></tr></tbody></table>
+<p><strong>Landscape.</strong> Weight-only 4-bit PTQ is solved for standard benchmarks; W4A4 is an incremental transform race (QuaRot → SpinQuant → FlatQuant → ReSpinQuant) judged mainly on WikiText PPL. The live frontier is <em>reasoning under compression</em>: 8-bit/W4A16 are safe, W4A4/3-bit are not (2504.04823); quantized and pruned reasoning models emit <em>more</em> tokens (2606.00206, 2509.12464); layer pruning that is "free" on QA collapses test-time scaling (2510.22228), while unstructured pruning may preserve it (2604.25098). FP8 training is mature; FP4 pretraining has two competing recipes (NVFP4 vs MXFP4/Quartet). Precision scaling laws say heavily over-trained models quantize worse post hoc. A 2025–26 offshoot quantizes the RL rollout loop (QaRL, TRACE). MoE work is mostly offloading systems plus an unresolved prune-vs-merge dispute (REAP vs REAM); dynamic top-k for fine-grained MoE is the 2026 growth area. Evaluation critique (flips, agentic, long-context, multilingual safety) is the most consistent theme, yet new methods still headline PPL.</p>
+<p><strong>Gaps.</strong></p>
+<ol><li>[contradiction] Layer pruning near-free on QA but catastrophic for long-CoT TTS; no diagnostic predicts which layers carry multi-step function.</li><li>[method-transfer] RAC-style self-generated-CoT calibration tested only for SparseGPT; untested for W4A4 rotations, GPTQ, MoE expert-pruning criteria.</li><li>[untested-assumption] Compression is evaluated with greedy single samples; effect on pass@k / self-consistency / best-of-N scaling curves is unmeasured (Expert-Sample is the only warning).</li><li>[diagnostic] No end-to-end cost-per-solved-problem accounting (bits × tokens × latency) although compressed reasoners emit more tokens.</li><li>[scaling-regime] Precision scaling laws fit on pretraining loss ≤1.7B; whether RL / long-CoT post-training changes quantization sensitivity is unmeasured.</li><li>[method-transfer] Rotation transforms designed on text-only dense LLMs; modality- or expert-specific rotations open; token pruning amplifies W4A4 error (QAPruner 2604.02816).</li><li>[contradiction] Prune vs merge for MoE experts (REAP vs REAM) not settled by a controlled study.</li><li>[untested-assumption] Compression methods assumed to compose orthogonally; super-/sub-additivity on reasoning untested.</li><li>[scaling-regime] Activation-sparsity speedups measured at batch 1, short outputs.</li><li>[untested-assumption] FP4-pretrained models' robustness on long-context / reasoning / RL stability unknown.</li><li>[diagnostic] No validated cheap proxy predicting long-context / multilingual / safety degradation.</li><li>[scaling-regime] Native ternary/2-bit models untested on long CoT, long context, RL.</li></ol>
+<p><strong>Saturation.</strong> Overcrowded: W4A16 PTQ; W4A4 rotation papers on LLaMA PPL; MoE offloading systems; depth pruning on MC benchmarks; on-policy-distillation variants. Under-explored: compression × TTS curves; cost-per-solved-problem; reasoning-trace calibration for quantization/MoE; per-expert mixed precision at DeepSeek/Qwen3 scale; composition effects; native low-bit on reasoning.</p>
+<h3 id="1d-decoding-acceleration--efficient-reasoning">1.D Decoding acceleration &amp; efficient reasoning</h3>
+<table><thead><tr><th>Paper (arXiv)</th><th>Year/Venue</th><th>Method</th><th>Key claimed result</th><th>URL</th></tr></thead><tbody><tr><td>Medusa (2401.10774)</td><td>2024</td><td>Extra decoding heads + tree attention</td><td>2.2–3.6x</td><td>https://arxiv.org/abs/2401.10774</td></tr><tr><td>Lookahead Decoding (2402.02057)</td><td>ICML'24</td><td>Jacobi iteration + n-gram cache</td><td>Up to 1.8x</td><td>https://arxiv.org/abs/2402.02057</td></tr><tr><td>LayerSkip (2404.16710)</td><td>ACL'24</td><td>Early-exit self-speculation</td><td>1.34–2.16x</td><td>https://arxiv.org/abs/2404.16710</td></tr><tr><td>EAGLE-2 (2406.16858)</td><td>EMNLP'24</td><td>Dynamic draft tree</td><td>3.05–4.26x</td><td>https://arxiv.org/abs/2406.16858</td></tr><tr><td>EAGLE-3 (2503.01840)</td><td>NeurIPS'25</td><td>Direct token prediction, multi-layer fusion, training-time test</td><td>3.0–6.5x</td><td>https://arxiv.org/abs/2503.01840</td></tr><tr><td>MagicDec (2408.11049)</td><td>ICLR'25</td><td>Sparse-KV draft at large batch × long context</td><td>1.84–2.51x at batch 32–256</td><td>https://arxiv.org/abs/2408.11049</td></tr><tr><td>TriForce (2404.11912)</td><td>2024</td><td>Hierarchical speculation with retrieval KV</td><td>2.31x at 128K</td><td>https://arxiv.org/abs/2404.11912</td></tr><tr><td>DeepSeek-V3 MTP (2412.19437)</td><td>2024</td><td>MTP modules as self-drafter</td><td>85–90% 2nd-token acceptance, 1.8x TPS</td><td>https://arxiv.org/abs/2412.19437</td></tr><tr><td>Lookahead Reasoning (2506.19830)</td><td>2025</td><td>Step-level speculation for reasoning</td><td>Token-level SD capped by acceptance decay</td><td>https://arxiv.org/abs/2506.19830</td></tr><tr><td>SD: Performance or Illusion? (2601.11580)</td><td>MLSys'26</td><td>Systematic vLLM study of SD variants</td><td>Verification dominates; real ≪ theoretical</td><td>https://arxiv.org/abs/2601.11580</td></tr><tr><td>SD for RL rollouts (2604.26779)</td><td>2026</td><td>MTP / EAGLE-3 for RL rollouts</td><td>1.8x rollout throughput</td><td>https://arxiv.org/abs/2604.26779</td></tr><tr><td>DFlash (2602.06036)</td><td>ICML'26</td><td>Block-diffusion drafter + AR verifier</td><td>&gt;6x lossless; 2.5x over EAGLE-3</td><td>https://arxiv.org/abs/2602.06036</td></tr><tr><td>DREAM VLM-SD (2505.19201)</td><td>NeurIPS'25</td><td>Vision-aware drafter</td><td>Up to 3.6x</td><td>https://arxiv.org/abs/2505.19201</td></tr><tr><td>LLaDA (2502.09992)</td><td>2025</td><td>8B masked diffusion LM</td><td>≈ LLaMA3-8B</td><td>https://arxiv.org/abs/2502.09992</td></tr><tr><td>Block Diffusion (2503.09573)</td><td>ICLR'25</td><td>AR over blocks, diffusion within</td><td>KV cache + flexible length</td><td>https://arxiv.org/abs/2503.09573</td></tr><tr><td>Fast-dLLM (2505.22618)</td><td>ICLR'26</td><td>Approx. KV cache + confidence parallel decode</td><td>Up to 27.6x over dLLM baseline</td><td>https://arxiv.org/abs/2505.22618</td></tr><tr><td>dLLM vs AR characterization (2510.04146)</td><td>2025</td><td>Systems profiling</td><td>Open dLLMs often slower than AR</td><td>https://arxiv.org/abs/2510.04146</td></tr><tr><td>JustGRPO (2601.15165)</td><td>2026</td><td>Left-to-right GRPO for dLLMs</td><td>Arbitrary order narrows reasoning</td><td>https://arxiv.org/abs/2601.15165</td></tr><tr><td>Overthinking o1-like (2412.21187)</td><td>ICML'25</td><td>Efficiency metrics + self-training</td><td>~44.8% fewer tokens</td><td>https://arxiv.org/abs/2412.21187</td></tr><tr><td>Underthinking (2501.18585)</td><td>NeurIPS'25</td><td>Penalize premature thought switching</td><td>+10.7% Pass@1</td><td>https://arxiv.org/abs/2501.18585</td></tr><tr><td>L1 / LCPO (2503.04697)</td><td>COLM'25</td><td>RL with length target in prompt</td><td>Precise length control</td><td>https://arxiv.org/abs/2503.04697</td></tr><tr><td>ThinkPrune (2504.01296)</td><td>TMLR'26</td><td>RL with tightening token cap</td><td>Half length, ~2% AIME drop</td><td>https://arxiv.org/abs/2504.01296</td></tr><tr><td>AdaptThink (2505.13417)</td><td>2025</td><td>RL think / no-think by difficulty</td><td>−53% length, +2.4% acc</td><td>https://arxiv.org/abs/2505.13417</td></tr><tr><td>NoThinking (2504.09858)</td><td>2025</td><td>Skip thinking + parallel best-of-N</td><td>Beats Thinking at low budget, 9x lower latency</td><td>https://arxiv.org/abs/2504.09858</td></tr><tr><td>Coconut (2412.06769)</td><td>COLM'25</td><td>Continuous latent thought</td><td>Better on search-heavy logic</td><td>https://arxiv.org/abs/2412.06769</td></tr><tr><td>Limits of latent CoT (2602.01148)</td><td>2026</td><td>Theory + experiments</td><td>ProsQA 97.0 vs GSM8K 34.1</td><td>https://arxiv.org/abs/2602.01148</td></tr><tr><td>Looped-transformer latent reasoning (2606.31779)</td><td>2026</td><td>Recurrent depth</td><td>Latent CoT trails explicit above ~1B</td><td>https://arxiv.org/abs/2606.31779</td></tr><tr><td>DeepConf</td><td>ICLR'26</td><td>Confidence filtering + early stop of parallel traces</td><td>−84.7% tokens on AIME25</td><td>https://mlanthology.org/iclr/2026/fu2026iclr-deep/</td></tr><tr><td>ST-BoN (2503.01422)</td><td>NeurIPS'25</td><td>Early-truncated best-of-N</td><td>−70–80% compute</td><td>https://arxiv.org/abs/2503.01422</td></tr><tr><td>Kinetics (2506.05333)</td><td>NeurIPS'25</td><td>TTS scaling law counting memory access</td><td>Attention dominates cost</td><td>https://arxiv.org/abs/2506.05333</td></tr><tr><td>Don't Overthink it (2505.17813)</td><td>2025</td><td>Prefer shorter sampled chains</td><td>Shortest chain up to +34.5% acc</td><td>https://arxiv.org/abs/2505.17813</td></tr><tr><td>Thought-free inference (2511.03408)</td><td>2025</td><td>Train with thought, infer without</td><td>More no-think data: AIME 76.6 → 43.3</td><td>https://arxiv.org/abs/2511.03408</td></tr><tr><td>OckBench (2511.05722)</td><td>2025</td><td>Accuracy + token efficiency benchmark</td><td>26x length variance at similar acc</td><td>https://arxiv.org/abs/2511.05722</td></tr><tr><td>VIG (2608.21883)</td><td>2026</td><td>Visual-information-gain reward for MM CoT compression</td><td>Many CoT tokens never consult the image</td><td>https://arxiv.org/abs/2608.21883</td></tr><tr><td>ChainV (2511.17106)</td><td>2025</td><td>Visual hints cut reflection loops</td><td>−34.1% latency, +3.4% acc</td><td>https://arxiv.org/abs/2511.17106</td></tr></tbody></table>
+<p>Also seen: s1 2501.19393, TALE 2412.18547, Chain of Draft 2502.18600, LC-R1 2506.14755, NEAT 2602.02010, SAIL-RL 2511.02280, V-Skip 2601.13879, MASSV 2505.10526, agentic token-vs-latency 2511.08042, multi-sample SD temperature 2503.05330, dLLM inference survey 2607.12829.</p>
+<p><strong>Landscape.</strong> Speculative decoding is mature for small-batch chat (Medusa → EAGLE-3, LayerSkip, MTP); the open questions are systems behaviour (verification dominates on vLLM; real ≪ theoretical) and reasoning workloads, where token-level acceptance decay pushes toward step-level speculation. Diffusion LLMs moved from "can they model language" to "can they be faster": method papers claim 10–27x over their own baselines while systems profiling finds them slower than optimized AR; diffusion-as-drafter (DFlash) may be the synthesis. Efficient reasoning is the most crowded area: length-penalty RL on R1-Distill-1.5B/7B math (L1, ThinkPrune, AdaptThink, Thinkless…), training-free early exit, confidence-based parallel-sample pruning, and latent reasoning (which trails explicit CoT above ~1B). The central disagreement: within a question, shorter chains are more often correct; across questions, forced brevity collapses on hard problems. Tokens are an imperfect proxy for wall-clock (Kinetics; agentic 10–14x tokens vs 4–6x latency). MLLM efficient reasoning trails text by 6–12 months.</p>
+<p><strong>Gaps.</strong></p>
+<ol><li>[contradiction] Within-question "shorter is better" vs across-question "forced brevity collapses"; per-instance oracle-length regret decomposition missing.</li><li>[untested-assumption] CoT compression assumed to save wall-clock proportionally; compressed CoT may be less draftable (lower SD acceptance). Nobody measures EAGLE-3/MTP acceptance before vs after length-penalty RL.</li><li>[diagnostic] No efficient-reasoning benchmark reports accuracy + tokens + serving wall-clock + memory together.</li><li>[scaling-regime] SD at T≈1, large batch, &gt;10K outputs, under policy drift during RL — poorly characterized.</li><li>[method-transfer] Step-level speculation and confidence early-exit use similar signals but were never unified.</li><li>[contradiction] dLLM speed claims conflict; matched-quality comparison vs vLLM AR + EAGLE-3 missing.</li><li>[untested-assumption] dLLM parallel-unmasking heuristics validated only on short outputs; effect on long CoT unknown.</li><li>[scaling-regime] Latent reasoning at 7B+ with RL and wall-clock gains not shown.</li><li>[method-transfer] MLLM SD evaluated on short captions, not long visual CoT.</li><li>[untested-assumption] Early-exit/parallel pruning assume calibrated confidence; length-penalty RL likely changes calibration.</li><li>[contradiction] Parallel-short (NoThinking) vs sequential-long; no size/hardware/budget rule.</li><li>[diagnostic] Results concentrated on R1-Distill math; frontier scale / code / agents / MLLMs unreported.</li></ol>
+<p><strong>Saturation.</strong> Overcrowded: length-penalty RL on small math models; think-or-not routing; training-free early exit; dLLM caching tricks; EAGLE-style drafter tweaks. Under-explored: CoT compression × SD × batching; wall-clock-grounded benchmarks; SD for RL rollouts under drift; length control for dLLMs; calibration after RL compression.</p>
+<hr />
+<p><a id="ranked-ideas"></a></p>
+<h2 id="ranked-ideas">Ranked Ideas</h2>
+<p><strong>Ideas evaluated</strong>: 18 个原始候选（3 个 lens 分片 × 6）→ 机械去重得 13 个 → 13 个都通过了客观可行性筛选（<em>[评审修正：C4 的检查做得不到位，Nemotron-H-8B 只有 8K 上下文]</em>）→ 独立 triage 排序 → 前 3 名做深度新颖性检查 → 0 个跑了 pilot（无 GPU）。 完整候选及标注见 <a href="candidate_pool.md"><code>candidate_pool.md</code></a>。</p>
+<blockquote><p><strong>Triage 的评审身份</strong>：triage 由一个上下文全新的 Claude 子代理完成（魔鬼代言人，看不到生成过程，另做了 12 次检索）。它<strong>不是</strong> ARIS 要求的跨模型家族评审（Codex 不可用）。下面的排序应视为 provisional，需要等 GPT 类评审确认。</p></blockquote>
+<h3 id="triage-排序n--新颖性i--信息价值f--可行性各-110">Triage 排序（N = 新颖性，I = 信息价值，F = 可行性，各 1–10）</h3>
+<table><thead><tr><th>#</th><th>ID</th><th>题目</th><th>N</th><th>I</th><th>F</th><th>一句话理由</th></tr></thead><tbody><tr><td>1</td><td>C1(+C5)</td><td>压缩后的 CoT 的"可投机性税"，以及随机驱逐免费午餐的消失</td><td>8</td><td>9</td><td>9</td><td>直接挑战领域的头条指标（token 数）；正反结果都有用；几天的推理就能出结果</td></tr><tr><td>2</td><td>C4</td><td>混合架构（linear + softmax）中少量 softmax 层的 KV 驱逐</td><td>8</td><td>8</td><td>6</td><td>真正部署的架构上的空白 regime；出现断崖就能给出部署规则</td></tr><tr><td>3</td><td>C2</td><td>Thinking MLLM 对视觉 token 剪枝的惩罚更大</td><td>7</td><td>8</td><td>7</td><td>少见的匹配对照（Instruct/Thinking）；会重置推理 MLLM 剪枝的评测方式</td></tr><tr><td>4</td><td>C3</td><td>MoE 专家剪枝 vs 合并 = pass@1 vs pass@k 之争</td><td>7</td><td>8</td><td>6</td><td>能平息 REAP vs REAM 的争论（前提是校准数据不是真正原因）</td></tr><tr><td>5</td><td>C9</td><td>PTQ 会把 RL 学到的增量量化掉</td><td>5</td><td>8</td><td>9</td><td>框架部分被抢先，但 pilot 几乎零成本，部署答案很明确</td></tr><tr><td>6</td><td>C5</td><td>（并入 C1）压缩让随机驱逐不再免费</td><td>6</td><td>6</td><td>8</td><td>方向可以预判；作为 C1 的第二个维度更强</td></tr><tr><td>7</td><td>C12</td><td>自我转写：多轮对话下与查询无关的视觉 KV 压缩</td><td>6</td><td>7</td><td>7</td><td>多轮诊断很有价值；方法本身是 KVzip / StreamMem 的迁移</td></tr><tr><td>8</td><td>C8</td><td>重要性平稳性能预测"打分何时胜过随机"</td><td>6</td><td>7</td><td>7</td><td>野心大的统一解释；与层深 / information horizon 混杂</td></tr><tr><td>9</td><td>C7</td><td>随机抽样 headroom：任何选择器最多能赚多少</td><td>6</td><td>7</td><td>9</td><td>便宜；但 best-of-R 测的是方差，不是上限</td></tr><tr><td>10</td><td>C10</td><td>用 drafter 的 surprisal 当 KV 驱逐信号</td><td>7</td><td>5</td><td>7</td><td>最可能的结果是"打平随机"，而这已被别人声称过</td></tr><tr><td>11</td><td>C11</td><td>视觉 grounded token 一致率作为剪枝评测指标</td><td>6</td><td>6</td><td>8</td><td>接近 VIG 的打分；可能只是复现 hard subset 的结论</td></tr><tr><td>12</td><td>C6</td><td>分叉 token 的 KL 能预测 TTS 损伤</td><td>5</td><td>6</td><td>8</td><td>在 2606.00206 之后剩下的空间很薄；约 10 个点上算 ρ</td></tr><tr><td>13</td><td>C13</td><td>量化 × KV 驱逐的长度中介叠加效应</td><td>4</td><td>5</td><td>8</td><td>大部分已被 2510.10964 和 ThinKV 做过</td></tr></tbody></table>
+<p><strong>合并建议</strong>（triage 提出，已采纳）：C1 + C5 合为一篇（同一批模型对、同一批 trace、同一个冗余度统计量）；C7 + C8 可合为一篇关于随机基线问题的诊断论文（备选）。</p>
+<h3 id="idea-1-c1c5--压缩吃掉了冗余cot-长度压缩对投机解码与-kv-驱逐的隐性代价">🥇 Idea 1: C1+C5 — "压缩吃掉了冗余"：CoT 长度压缩对投机解码与 KV 驱逐的隐性代价</h3>
+<ul><li><p><strong>Method（我们实际做什么）</strong>:</p>
+<ol><li>选公开的"冗长 / 压缩"推理模型对，必须是真正的父子关系：R1-Distill-Qwen-1.5B → ThinkPrune-1.5B；DeepScaleR-1.5B → L1-1.5B；R1-Distill-7B → AdaptThink-7B / LC-R1-7B。</li><li>在同一批 MATH-500 / AIME 题目上生成 trace，用 teacher forcing 离线测投机解码的接受长度 τ。drafter 用三种：无模型的 n-gram / 后缀查找、固定的小 drafter、EAGLE-3。再用压缩后的 trace 重新蒸馏 drafter，把"drafter 分布偏移"和"可预测 token 本身被删掉"这两个原因分开。</li><li>在 vLLM 里测 batch=1 和真实 serving batch 下每道题的 wall-clock，算"有效压缩比" = wall-clock 比 / token 比。</li><li>在同一批 trace 上比较随机驱逐（保护 prompt）、R-KV 和 SnapKV，把"随机 vs 打分"的差距对 trace 冗余度（n-gram 复述率）做回归。</li></ol></li><li><strong>Hypothesis</strong>: 长度惩罚 RL 删掉的主要是低熵、高可投机、高冗余的填充内容，所以开 SD 时 token 节省会高估 wall-clock 节省，而且随机驱逐在压缩后的 trace 上不再"免费"。</li><li><strong>Minimum experiment</strong>: R1-Distill-1.5B vs ThinkPrune-1.5B，200 道 MATH-500，离线 n-gram τ + vLLM SD，约 1 GPU-h。</li><li><del><strong>Kill criterion（triage 给出）</strong>: 在两边都答对的题上，teacher-forced τ 的相对下降 &lt; 10%。</del> <strong>[评审作废]</strong> n-gram / suffix drafter 的 τ 会随历史长度增长，trace 变短会机械地拉低 τ，所以这个未做匹配的标准偏向 PROCEED。修正后的 kill / promote 标准见 <a href="#external-critical-review">External Critical Review</a>。</li><li><strong>Risk</strong>: MEDIUM。具名风险：(a) drafter 偏移解释了全部下降，结论退化成"重训 drafter 就好"；(b) serving batch 下 SD 本来就收益有限；(c) 父模型配对必须正确。</li><li><strong>Contribution type</strong>: empirical + diagnostic</li><li><strong>Pilot</strong>: SKIPPED（无 GPU）</li></ul>
+<h3 id="c4评审阶段-abandon-混合架构的-softmax-层需要不同的-kv-驱逐策略">❌ C4（评审阶段 ABANDON）— 混合架构的 softmax 层需要不同的 KV 驱逐策略</h3>
+<blockquote><p>原排名第 2，在 External Critical Review 中被判 ABANDON，原因见该节。下面保留原方案供参考。</p></blockquote>
+<ul><li><p><strong>Method</strong>:</p>
+<ol><li>选尺寸匹配的混合 / 稠密模型对：Nemotron-H-8B vs Llama-3.1-8B / Qwen3-8B、Falcon-H1-7B、Mamba-in-the-Llama 蒸馏模型 vs 其父模型。</li><li>只对 softmax 层的 KV 施加相同的驱逐策略（sink+window、SnapKV、随机、Ada-KV / PyramidKV 预算），预算 5–50%。</li><li>在 RULER（NIAH、multi-key、variable tracking）和 LongBench 上测 8K–128K。</li><li>逐层统计 recency mass（最近 512 token 上的注意力占比）和注意力熵。</li></ol></li><li><strong>Hypothesis</strong>: 混合架构里的 softmax 层专职检索，所以窗口类驱逐会断崖式失效，打分类驱逐每字节保留的质量比稠密模型更高，稠密模型的层预算形状是错的。另一种可能是 SSM 已经承担了局部上下文，驱逐几乎免费。</li><li><strong>Pilot 说服条件（triage 给出）</strong>: (1) 相同相对预算下，混合模型上窗口驱逐比稠密模型多掉 ≥ 20 分，而 SnapKV 的差距小得多；(2) 混合模型 softmax 层的 recency mass 不到稠密模型中位数的一半；(3) 128K 时 softmax 层的 KV 每条序列仍有数 GB。</li><li><strong>Risk</strong>: MEDIUM–HIGH。具名风险："KV 本来就小，何必驱逐"；混合与稠密模型的训练数据不同（混杂因素）；cache hook 的工程量。</li><li><strong>Contribution type</strong>: empirical + diagnostic</li><li><strong>Pilot</strong>: SKIPPED（无 GPU）</li></ul>
+<h3 id="idea-2评审后升为第二-c2--thinking-mllm-对视觉-token-剪枝更脆弱且脆弱程度随思考长度增长">🥈 Idea 2（评审后升为第二）: C2 — Thinking MLLM 对视觉 token 剪枝更脆弱，且脆弱程度随思考长度增长</h3>
+<ul><li><p><strong>Method</strong>:</p>
+<ol><li>用 Qwen3-VL-{2,4,8}B 的 Instruct / Thinking 匹配对。</li><li>在 prefill 时一次性剪枝（随机、FastV、DART、下采样），保留 50/25/11%。</li><li>在 MathVista、MathVerse-vision-only、ChartQA、MMMU 和一个简单 VQA 对照集上测，只统计全 token 时两个模型都答对的题。</li><li>记录每个解码步对视觉 token 的注意力，算"晚期证据率"；在 Thinking 模型内部扫思考预算 1K / 4K / 16K。</li></ol></li><li><strong>Hypothesis</strong>: 相同保留率下，Thinking 模型的相对精度损失是 Instruct 的 2–3 倍，损失集中在长 trace 的后段回看。另一种可能是更长的思考补偿了缺失的视觉 token（test-time compute 替代视觉 token），这同样值得发表。</li><li><strong>Kill criterion</strong>: 25% 保留时 Thinking / Instruct 的相对损失比 &lt; 1.3 且置信区间重叠，同时思考预算曲线是平的。</li><li><strong>Risk</strong>: MEDIUM。具名风险：两者的后训练差异不止 trace 长度。用 Thinking 模型内部的预算扫描来回应这个风险，不加模块。</li><li><strong>Contribution type</strong>: empirical + diagnostic</li><li><strong>Pilot</strong>: SKIPPED（无 GPU）</li></ul>
+<h3 id="备选c3moe-剪枝-vs-合并-passkc9ptq-是否抹掉-rl-增量约-15-gpu-h可当-side-pilot">备选：C3（MoE 剪枝 vs 合并 pass@k）、C9（PTQ 是否抹掉 RL 增量，约 1.5 GPU-h，可当 side pilot）</h3>
+<p><a id="eliminated-ideas"></a></p>
+<h2 id="eliminated--deprioritized-ideas">Eliminated / Deprioritized Ideas</h2>
+<table><thead><tr><th>Idea</th><th>原因</th></tr></thead><tbody><tr><td>C4 混合架构 softmax 层 KV 驱逐</td><td><strong>评审阶段 ABANDON</strong>：(1) 主力模型 Nemotron-H-8B-Base 只有 8K 上下文，在 32K–128K 测到的是外推失败，不是驱逐的效应；(2) Falcon-H1 是并行混合结构，不符合"少量 softmax 层"的前提；(3) 128K 时 softmax KV 约 2 GiB，驱逐 90% 只省约 1.8 GiB / 序列；(4) 已有证据倾向于否定原假设；(5) GateSight、HeadWiseKV、DeltaS 三篇同期方法论文已占据这块。复活条件：找到有父模型对应、上下文 ≥32K 的混合模型，并且 4K/8K 训练长度内的测试（约 2 GPU-h）出现断崖</td></tr><tr><td>C13 量化 × KV 驱逐叠加</td><td>大部分已被 "Not All Bits Are Equal" 2510.10964（ICLR'26，1700+ 组 GPTQ × R-KV 配置）和 ThinKV 2510.01290 覆盖；只剩形式化的中介分析</td></tr><tr><td>C6 Fork-token KL 预测器</td><td>2606.00206 已报告量化 KL 集中在高熵 token；跨家族预测只在约 10 个点上，统计上脆弱</td></tr><tr><td>C11 grounded-token 一致率</td><td>grounded 判定与 VIG 2608.21883 的打分几乎相同；可能只复现 hard subset 排名</td></tr><tr><td>C10 drafter surprisal 驱逐</td><td>最可能的结果是"打平随机"，而 Random Attention 2609.03430 已有此结论</td></tr><tr><td>C5</td><td>并入 C1，不再单独成文</td></tr><tr><td>C7、C8、C12</td><td>没有淘汰，保留为候选（C7 + C8 可合并成诊断论文）</td></tr></tbody></table>
+<hr />
+<p><a id="novelty-verification"></a></p>
+<h2 id="novelty-verification">Novelty Verification</h2>
+<p>三个子代理分别对前 3 名 idea 做深度新颖性检查，每个 39–50 次 WebSearch（以 extended 为主，重点覆盖 2026 年 5–10 月），判定遵循 ARIS 的 NOVELTY VERDICT LIMITS。<strong>限制</strong>：WebFetch 无法访问 arxiv.org（DNS 失败），判断全部基于检索摘要和摘录，没有读全文。评审者与执行者同属 Claude 家族（不是跨模型评审）。</p>
+<table><thead><tr><th>Idea</th><th>新颖性得分</th><th>判定</th><th>最近的已有工作</th><th>同期竞争（近 6 个月）</th></tr></thead><tbody><tr><td>C1+C5 压缩吃掉冗余</td><td><strong>7/10</strong></td><td><strong>PROCEED</strong></td><td>Random Attention 2609.03430；R-KV 2505.24133；ReCo 2608.04771；Scaling Up Speeding Up 2509.04474；SD Performance-or-Illusion 2601.11580</td><td>Random Attention 的作者可能跟进；AvoKV-E 2610.03007；Spend Bytes on Breadth 2610.05685</td></tr><tr><td>C4 混合架构 softmax 层 KV 驱逐</td><td><strong>6/10</strong></td><td><strong>PROCEED</strong></td><td>GateSight 2610.14754；HeadWiseKV 2609.02029；Protection Is (Nearly) All You Need 2605.18053；DeltaS 2609.27470；Some Attention is All You Need for Retrieval 2510.19861</td><td><strong>竞争激烈</strong>：2026 年 9–10 月已有 3 篇混合架构驱逐的方法论文</td></tr><tr><td>C2 Thinking MLLM 剪枝更脆弱</td><td><strong>6/10</strong></td><td><strong>PROCEED</strong></td><td>DSTP 2604.12358；VisionPulse 2605.31457；ViMoD 2610.12060；TVC 2503.13360；On Test-Time Scaling for VLMs 2606.28864</td><td>ViMoD（10 月 8 日，只用了 Instruct-4B）；AVIS 2606.11576；L2T 2610.15810</td></tr></tbody></table>
+<h3 id="c1c5710proceed">C1+C5（7/10，PROCEED）</h3>
+<ul><li><strong>核心空白</strong>：约 39 次检索中，没有任何论文在 ThinkPrune / L1 / AdaptThink / LC-R1 上测过投机解码接受率或随机驱逐的鲁棒性。也没有论文用"trace 冗余度"把 SD 和 KV 驱逐联系起来。</li><li><p><strong>新的具名风险</strong>：</p>
+<ol><li><strong>位置混杂</strong>：EAGLE 类方法的 τ 会随输出位置下降（Test-Time Speculation 2605.09329、SpecExtend 2505.20776）。压缩后的 trace 更短，可能反而显示更高的 EAGLE-3 τ，从而掩盖甚至反转效应。<strong>必须在相同解码位置上比较，并以 n-gram / suffix τ（没有训练长度偏差）为主指标。</strong></li><li><strong>"填充 token 是低熵的"可能不成立</strong>：overthinking 相关工作发现 "wait / but" 这类犹豫 token 是高熵的；DLER 2510.15110 发现部分长度惩罚方法削减的是高熵尾部。机制需要实测，不能预设。</li><li>可能被评价为"只是测量 / 结果显然"。要立住，需要效应量足够大、重蒸馏 drafter 之后效应仍然存在，并且冗余度回归在 ≥3 个模型对、2 个尺度上都成立。</li></ol></li><li><strong>定位</strong>：在同一父模型的冗长→压缩推理模型对上证明：长度惩罚 RL 在相同解码位置上降低了 model-free 和 EAGLE-3 的接受长度（重蒸馏 drafter 后仍然如此），并且随机与打分 KV 驱逐之间的差距按 n-gram 复述率的损失成比例扩大。因此在投机解码下，token 数压缩高估了 wall-clock 节省，随机驱逐也不再免费。</li></ul>
+<h3 id="c4610proceed竞争激烈">C4（6/10，PROCEED，竞争激烈）</h3>
+<ul><li><strong>核心空白</strong>：没有论文做 size-matched / 蒸馏自父模型的混合 vs 稠密受控对照，也没有用逐层 recency mass / 熵来解释失败。已有工作要么是单模型族的方法论文（GateSight、HeadWiseKV、DeltaS），要么只附带测了一个混合模型（2605.18053）。</li><li><strong>与假设相反的证据</strong>：2605.18053 发现混合模型在相同策略集下反而<strong>更不脆弱</strong>；HeadWiseKV 用按头的窗口在混合模型的全局层上接近 full-KV；Hymba 发现有 SSM 头时局部注意力就够用。→ <strong>"窗口驱逐会断崖式失效"这一假设风险很高</strong>，必须写成结论不预设方向的"图谱"，覆盖 64–128K 以及 multi-key / variable-tracking 任务，并把 GateSight / HeadWiseKV 列为基线。</li><li>未能确认存在的 triage 邻居："When Perplexity Lies" 2603.26556 没有出现在任何检索结果里；HySparse 2602.03560 只有二手摘要。两者都不引用。</li></ul>
+<h3 id="c2610proceed">C2（6/10，PROCEED）</h3>
+<ul><li><strong>核心空白</strong>：没有匹配的 Instruct vs Thinking 剪枝对照（3 个尺寸 + 只统计两边都答对的题），也没有在同一 checkpoint 内扫思考预算。DSTP、VisionPulse、ViMoD 都只是借"解码期偏移"来引出各自的方法。</li><li><strong>必须先人工核对</strong>：DSTP 的结果表里<strong>可能已经同时有 Qwen3-VL-4B 的 Instruct 和 Thinking 两行</strong>（只有一条摘录提到，未核实）。如果有，claim 1 降级为"在 3 个尺寸上加 both-correct 控制的确认性结果"，改以 claim 2–3（晚期证据的因果测量 + 思考预算曲线）为主线。</li><li><strong>反向证据</strong>（让问题不那么显然，但会提高立论门槛）：On Test-Time Scaling for VLMs（图像的贡献在早期之后急剧下降）、TVC（后半段去掉图像只掉约 2 分）、VisualSwap（Thinking 模型的"重看"往往没有真正去看图）。→ 晚期证据必须用<strong>因果消融</strong>来证明，不能只看注意力。</li></ul>
+<hr />
+<p><a id="external-critical-review"></a></p>
+<h2 id="external-critical-review">External Critical Review</h2>
+<ul><li><strong>评审方</strong>：上下文全新的 Claude 子代理，按 NeurIPS/ICML 资深审稿人的对抗式标准评审，另做了 11 次检索来抽查事实。<strong>属于同家族评审，不是 ARIS 要求的跨模型家族（GPT）评审。</strong></li><li><strong>完整 trace</strong>：<a href="../.aris/traces/research-review/brief.md"><code>.aris/traces/research-review/brief.md</code></a>、<a href="../.aris/traces/research-review/review_round1.md"><code>review_round1.md</code></a></li></ul>
+<table><thead><tr><th>方向</th><th>判定</th><th>模拟评分（按原计划 → 补齐控制后）</th><th>档次</th></tr></thead><tbody><tr><td><strong>C1+C5</strong> 压缩吃掉冗余</td><td><strong>PROCEED（第一顺位）</strong></td><td>5 → 6 /10</td><td>Findings / 主会 borderline</td></tr><tr><td><strong>C2</strong> Thinking MLLM 剪枝</td><td><strong>PROCEED（第二顺位）</strong></td><td>5 → 6 /10</td><td>Findings / 主会 borderline</td></tr><tr><td><strong>C4</strong> 混合架构 KV 驱逐</td><td><strong>ABANDON</strong></td><td>4 /10</td><td>workshop / Findings</td></tr></tbody></table>
+<h3 id="评审核实过的事实">评审核实过的事实</h3>
+<ul><li>DeepScaleR-1.5B 微调自 R1-Distill-Qwen-1.5B。ThinkPrune 有两个 checkpoint（<code>…R1-Distill-Qwen-1.5B-thinkprune-iter2k</code> 和 <code>…DeepScaleR-1.5B-Preview-thinkprune-iter2k</code>），配对时必须明确选哪一个。</li><li>没有找到 R1-Distill-Qwen-1.5B/7B 的公开 EAGLE-3 head，需要自己训练。</li><li>Nemotron-H-8B-Base 只有 <strong>8K 上下文</strong>（52 层里只有 4 层 attention）；Falcon-H1 是<strong>并行</strong>混合结构。</li><li>DREAM-R 2605.28678 在多模态消融实验中已报告"长度奖励越强，验证接受率越低"，必须作为部分先例引用。</li></ul>
+<h3 id="c1c5关键缺陷按严重程度排序">C1+C5：关键缺陷（按严重程度排序）</h3>
+<ol><li><strong>主指标有长度偏差（最严重）。</strong> prompt-lookup / suffix drafter 的 τ 会随历史长度增长，压缩后的 trace 更短，τ 会被机械地拉低。→ 要同时报告三种口径：按<strong>绝对解码位置分桶</strong>、<strong>固定查找窗口</strong>（如最近 2K token）、不做匹配。</li><li><strong>位置匹配可能把效应本身抹掉</strong>（冗余可能集中在冗长 trace 的后段）。→ <strong>预注册</strong>两种结论：(a) 相同位置 τ 更低 = 每 token 可投机性税；(b) 相同位置 τ 相等，但压缩模型删掉了高 τ 段 = 组合效应。</li><li><strong>"一个冗余统计量预测两者"对 n-gram τ 来说是循环论证。</strong> → 预测性结论只限于 EAGLE / 模型 drafter 的 τ 和驱逐差距。</li><li><strong>忽略了反向效应。</strong> 注意力和 KV 读取的代价随上下文增长（Kinetics），trace 减半带来的 wall-clock 节省本来就<strong>超过</strong>一半。→ 头条结论只能用<strong>实测 wall-clock</strong> 来支撑，结果也可能反过来。</li><li>1.5B target 上做 SD 的部署意义很小。→ wall-clock 和 EAGLE 的结论放在 7B 上做，用 R1-Distill-1.5B 当同族 drafter。</li><li>重蒸馏 drafter 时要<strong>按 token 数匹配</strong>，并测全部交叉组合（d_v→m_v、d_v→m_c、d_c→m_c）。</li><li>AdaptThink 是 think / no-think 的混合，必须按模式分层。</li><li>用 T≈0.6 的采样 trace（greedy 解码会循环，n-gram τ 会虚高）。期望接受长度直接用 target 的概率计算，对无损 SD 是精确的，一次前向即可。</li><li>both-correct 筛选会带来<strong>向均值回归</strong>。→ 定义为 ≥3/4 次答对，并加一组不做任何扰动的重采样对照。</li><li><p><strong>C5 的具体问题</strong>：</p>
+<ul><li>低预算下存在地板效应 → 在相同随机基线精度下比较差距。</li><li>R-KV 本身就是冗余感知方法，在冗余少的 trace 上同样会失去信号 → 差距的方向其实不确定。</li><li><strong>逐头冗余不受长度压缩影响</strong>，会限制效应的大小 → 随机基线必须逐头独立，和原论文一致。</li><li>相对预算和绝对预算都要报告。</li></ul></li></ol>
+<p><strong>最便宜的判别实验（约 1.5 GPU-h）</strong>：DeepScaleR-1.5B→L1-1.5B-Max 和 R1-Distill-1.5B→thinkprune-iter2k；200 道 MATH-500 × 4 个样本，T=0.6，16K 上限；一次前向拿到 log-prob，算 prompt-lookup 的期望接受长度（n=3, k=5），分三种口径：不匹配、按位置分桶（0–1K / 1–2K / 2–4K）、最近 2K 窗口；再对 L1 在同一权重下扫 3 个目标长度。</p>
+<ul><li><strong>Kill</strong>：两个模型对在所有匹配桶里的下降都 &lt;10%，<strong>并且</strong>不匹配口径下的下降在匹配后消失，<strong>并且</strong> L1 的长度扫描是平的。</li><li><strong>Promote</strong>：两个模型对在固定窗口 + 匹配位置下都下降 ≥15%，<strong>并且</strong>同一权重下 τ 随 L1 目标长度变短而下降 → 进入 7B + EAGLE-3。</li><li><strong>介于两者之间</strong>：只能按"删掉高 τ 段"的组合效应结论继续，并先预注册。</li></ul>
+<p><strong>结果 → 结论矩阵</strong></p>
+<table><thead><tr><th>SD 结果</th><th>驱逐结果</th><th>可主张的结论</th><th>是否成文</th></tr></thead><tbody><tr><td>A：7B 上 n-gram 和重蒸馏 EAGLE-3 在匹配位置下降 ≥15%，实测有效压缩比差于 token 比</td><td>F：在相同随机基线精度下差距扩大，且在 ≥5 个模型点上与冗余度相关</td><td>完整论点</td><td>主会 borderline（约 6）</td></tr><tr><td>A</td><td>G：差距不变</td><td>SD 税存在；压缩删掉的不是"复述"，逐头冗余才是主因</td><td>Findings / 主会 borderline</td></tr><tr><td>B：匹配后下降消失</td><td>任意</td><td>长度伪影的方法论 note</td><td>Workshop；驱逐结果为 F 时可投 Findings</td></tr><tr><td>C：token 匹配的重蒸馏后 EAGLE-3 下降消失</td><td>任意</td><td>"重训 drafter 即可"</td><td>Workshop</td></tr><tr><td>D：τ 不变或升高</td><td>G</td><td>压缩与 SD、驱逐可以相乘叠加</td><td>短文 / 负结果</td></tr><tr><td>E：τ 下降，但 KV 读取节省掩盖了它（wall-clock 比 ≤ token 比）</td><td>F</td><td>税存在但被注意力代价的节省掩盖；驱逐不再免费</td><td>Findings</td></tr><tr><td>任意</td><td>H：差距只在绝对预算下出现</td><td>预算伪影</td><td>否</td></tr></tbody></table>
+<p><strong>最小实验包（约 300 GPU-h ≈ 1.8 GPU-周，按每 GPU-h 带来的接收概率提升排序）</strong></p>
+<table><thead><tr><th>#</th><th>内容</th><th>成本</th></tr></thead><tbody><tr><td>P0</td><td>上面的判别实验，作为闸门</td><td>~1.5 GPU-h</td></tr><tr><td>P1</td><td>生成 trace：R1-Distill-7B → LC-R1-7B / AdaptThink-7B（按模式分层）+ 两个 1.5B 对；500 道 MATH-500 + 60 道 AIME × 4 样本，T=0.6，16–32K 上限</td><td>~25 GPU-h</td></tr><tr><td>P2</td><td>离线期望接受长度：n-gram（匹配 + 窗口）+ 用 R1-Distill-1.5B 给 7B 当 drafter</td><td>~10 GPU-h</td></tr><tr><td>P3</td><td>按 token 数匹配训练 EAGLE-3 head（7B 父模型 + 2 个子模型）并做交叉评测；只有 P0 / P2 判定 promote 才做</td><td>~150 GPU-h</td></tr><tr><td>P4</td><td>vLLM 实测 wall-clock：batch 1 / 32 / 128 × {无 SD, n-gram, EAGLE-3}，检验反向效应</td><td>~20 GPU-h</td></tr><tr><td>P5</td><td>on-policy 驱逐：Random Attention 官方代码（逐头随机）vs R-KV vs SnapKV；相对 10/25/50% + 绝对 1K/2K/4K；在相同随机基线精度下比较；≥6 个模型点</td><td>~80 GPU-h</td></tr><tr><td>P6</td><td>所有精度比较都加重采样对照，并报告 bootstrap 置信区间</td><td>~10 GPU-h</td></tr></tbody></table>
+<h3 id="c2关键缺陷">C2：关键缺陷</h3>
+<ol><li><strong>向均值回归是最可能的假阳性来源</strong>：长的采样思考 trace 自洽性更差，即使剪枝毫无影响，也会显得"剪枝惩罚更大"。→ 必须加 keep=100% 的重采样对照，both-correct 定义为 ≥k/n 次答对。</li><li><strong>最小实验缺少对机制的因果检验</strong>，而反向证据（TVC、VisualSwap、2606.28864）恰好集中在这里。</li><li>思考预算扫描与基础精度水平混杂 → 同时报告绝对损失。</li><li>Qwen3-VL 的 DeepStack 多层特征注入会与 LLM 内部的 FastV 式剪枝相互作用（评审凭记忆提出，待核实）。</li><li>DSTP 可能已覆盖 claim 1 → 先查它的表（不花 GPU）。</li></ol>
+<p><strong>最便宜的判别实验（约 2 GPU-h，先花 0 GPU 查 DSTP 的表）</strong>：Qwen3-VL-4B-Thinking，300 道 MathVista × 3 样本，4K 上限。(a) 生成到自身 CoT 长度的 50% 之后，mask 掉全部视觉 KV；(b) 在 Thinking 和 Instruct-4B 上做随机 25% prefill 剪枝，并加 keep=100% 的重采样对照。</p>
+<ul><li><strong>Kill</strong>：(a) 掉分 &lt;3（复现了 TVC 的结论），或 (b) 扣除对照后的比值 &lt;1.3。</li><li><strong>Promote</strong>：(a) 掉分 ≥8，<strong>并且</strong> (b) 扣除对照后的比值 ≥1.5。</li></ul>
+<table><thead><tr><th>结果</th><th>结论</th><th>是否成文</th></tr></thead><tbody><tr><td>3 个尺寸上扣除对照后比值 ≥1.5，晚期 mask 有因果效应，损失随预算增长</td><td>Thinking MLLM 需要解码期的视觉访问；针对它们的 prefill 剪枝评测不成立</td><td>主会 borderline（约 6）</td></tr><tr><td>比值高，但晚期 mask 代价小</td><td>更敏感，但原因不是晚期证据</td><td>Findings</td></tr><tr><td>比值 ≈1</td><td>prefill 剪枝可以迁移到 thinking 模型</td><td>Workshop</td></tr><tr><td>Thinking 损失更小</td><td>test-time compute 可以替代视觉 token</td><td>Findings / 主会（结果稳健的话）</td></tr><tr><td>加入重采样对照后效应消失</td><td>选择偏差造成的伪影</td><td>否</td></tr></tbody></table>
+<h3 id="c4abandon-的理由">C4：ABANDON 的理由</h3>
+<p>(1) 主力模型对没法在声称的长度上运行（Nemotron-H-8B 只有 8K 上下文）；(2) Falcon-H1 不符合前提；(3) 显存收益约 1.8 GiB / 序列；(4) 已有证据倾向于否定原假设；(5) 三篇同期方法论文已占据这块。<strong>复活条件</strong>：找到有父模型对应、上下文 ≥32K 的混合模型（如 HALO/HypeNet 的 Qwen3 转换版、Jet-Nemotron），并在训练长度内的测试（RULER 4K/8K，约 2 GPU-h）中看到断崖：窗口驱逐下比稠密模型多掉 ≥20 分，而 SnapKV 的差距 &lt;5 分。</p>
+<h3 id="评审对文献综述的勘误已在上文就地标注">评审对文献综述的勘误（已在上文就地标注）</h3>
+<ul><li>§1.B gap 1 的"混合架构驱逐无人研究"已过时 → 已标注。</li><li>C4 的可行性筛选做得不到位 → 已标注。</li><li>C1 的"没人测过"需要限定：DREAM-R 在多模态场景下已有部分先例。</li><li>n-gram / suffix τ 没有训练偏差，但强烈依赖历史长度 → 原 kill criterion 已作废。</li><li>综合部分第 1 条把两种随机基线危机合并得过快 → 已修正。</li><li>综合部分第 4 条"没人报 cost per solved problem"说得太强；Kinetics 的结论会反向影响 C1 → 已修正。</li><li>2605.18053 是单作者预印本，PAGE 部分反驳了它，原先给它的权重偏高。</li><li><strong>评审认为成立的部分</strong>：L1 / LC-R1 / AdaptThink 的父子配对；离线期望接受长度的方法；Qwen3-VL 的 2/4/8B Instruct / Thinking 匹配对；对 Random Attention 的描述；对过度拥挤方向的判断。</li></ul>
+<hr />
+<h2 id="最终结论">最终结论</h2>
+<h3 id="idea-1-c1c5-压缩吃掉冗余--recommended">🏆 Idea 1: C1+C5 "压缩吃掉冗余" — RECOMMENDED</h3>
+<ul><li>Pilot: SKIPPED（无 GPU），第一个闸门是约 1.5 GPU-h 的 P0</li><li>Novelty: PROCEED 7/10（最近的工作：Random Attention 2609.03430、R-KV、ReCo 2608.04771、DREAM-R 2605.28678）</li><li>Reviewer: PROCEED，5 → 6/10（同家族评审）</li><li>下一步：P0 → P1/P2 → （promote 后）P3–P6</li></ul>
+<h3 id="idea-2-c2-thinking-mllm-剪枝--backup">🥈 Idea 2: C2 Thinking MLLM 剪枝 — BACKUP</h3>
+<ul><li>先花 0 GPU 查 DSTP 的结果表 → 做约 2 GPU-h 的晚期 mask 因果测试</li><li>Novelty: PROCEED 6/10；Reviewer: PROCEED，5 → 6/10</li></ul>
+<h3 id="低成本附带-pilotc9ptq-是否抹掉-rl-增量约-15-gpu-h">低成本附带 pilot：C9（PTQ 是否抹掉 RL 增量，约 1.5 GPU-h）</h3>
+<h3 id="备选c3moe-剪枝-vs-合并看-passkc7c8随机基线诊断c12多轮视觉-kv">备选：C3（MoE 剪枝 vs 合并看 pass@k）、C7+C8（随机基线诊断）、C12（多轮视觉 KV）</h3>
+<h2 id="refined-proposal">Refined Proposal</h2>
+<ul><li><code>/research-refine-pipeline</code> <strong>本次没有运行</strong>：用户只要求文献调研和选题，而且没有 GPU、没有跨模型评审，<code>FINAL_PROPOSAL.md</code> 不存在。下一步可以对 C1+C5 运行 <code>/research-refine-pipeline</code>，生成 <code>refine-logs/FINAL_PROPOSAL.md</code> 和 <code>EXPERIMENT_PLAN.md</code>。</li></ul>
+<h2 id="next-steps">Next Steps</h2>
+<ul><li>[ ] 人工复核关键论文的全文：Random Attention 2609.03430（确认没有测过简洁模型）、DSTP 2604.12358（确认有没有 Thinking 行）、DREAM-R 2605.28678</li><li>[ ] 配置跨模型评审（Codex：<code>npm i -g @openai/codex &amp;&amp; codex login</code>，然后 <code>claude mcp add codex …</code>），对 novelty-check 和 research-review 补一轮 GPT 评审，拿到 ARIS 的 acceptance receipt</li><li>[ ] 在有 GPU 的环境中跑 C1 的 P0（约 1.5 GPU-h）和 C2 的晚期 mask 测试（约 2 GPU-h），可选再跑 C9</li><li>[ ] 对通过闸门的 idea 运行 <code>/research-refine-pipeline</code> → <code>/experiment-bridge</code> → <code>/auto-review-loop</code></li></ul>
+<blockquote><p><strong>关于下面的 BLOCKED</strong>：这是 ARIS 确定性 evidence gate 的如实输出，不是报告缺内容。novelty-check 和 research-review 两节内容完整，但评审方是同家族 Claude 子代理，没有跨模型家族（GPT / Codex）的 acceptance receipt，按规则不能也不应伪造。research-refine-pipeline 按用户的范围（调研 + 选题）跳过了。配置好 Codex 后运行 <code>/idea-discovery &quot;…&quot; — resume llm-mllm-efficiency-20261017</code>，即可补齐这三项。</p></blockquote>
+<p>&lt;!-- ARIS_IDEA_DISCOVERY_EVIDENCE_GATE:START --&gt;</p>
+<h2 id="evidence-gate">Evidence Gate</h2>
+<p><strong>Status:</strong> BLOCKED</p>
+<p>The workflow is not complete. Required stage evidence is missing:</p>
+<ul><li>BLOCKED: novelty-check review evidence missing (status=done)</li><li>BLOCKED: research-review review evidence missing (status=done)</li><li>BLOCKED: research-refine-pipeline evidence missing (status=skipped)</li></ul>
+<p>&lt;!-- ARIS_IDEA_DISCOVERY_EVIDENCE_GATE:END --&gt;</p>
+
+<footer class="aris-footer">
+  Generated by <a href="https://github.com/wanshuiyin/Auto-claude-code-research-in-sleep/blob/main/skills/render-html/SKILL.md">ARIS <code>/render-html</code></a> ·
+  source path <code>idea-stage/IDEA_REPORT.md</code> ·
+  SHA256 <code>109810cf0c58</code> ·
+  generated at 2026-10-17 15:08 UTC.
+  This is a generated view — edit the source Markdown, then re-render.
+</footer>
+</main>
+
+</div>
+
+<!-- P0 polish: paper popover host (populated by IIFE below) -->
+<div id="cite-pop" hidden role="dialog" aria-labelledby="cite-pop-title">
+  <button class="cp-close" type="button" aria-label="Close">×</button>
+  <div class="cp-content"></div>
+</div>
+
+<!-- P0 polish: figure lightbox (native <dialog>, graceful fallback) -->
+<dialog class="lightbox" id="figure-lightbox" aria-label="Figure detail">
+  <div class="lb-inner">
+    <button class="lb-close" type="button" aria-label="Close">×</button>
+    <img alt="" />
+    <figcaption></figcaption>
+  </div>
+</dialog>
+
+<!-- P0 polish: paper registry sidecar, embedded by render_html.py (--papers) -->
+<script>window.PAPER_REGISTRY = {};</script>
+
+<!-- P0 polish: interactive enhancements (TOC scrollspy, code-card auto-collapse,
+     paper popovers, figure lightbox, print-restore for <details>, blog-mode H2). -->
+<script>
+(function () {
+  "use strict";
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, function (c) {
+      return ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"})[c];
+    });
+  }
+
+  // --- Feature 5: Print degradation fix ---------------------------------
+  // Force every <details> open during print, restore the pre-print state after.
+  var _stashOpen = [];
+  var _printing = false;
+  window.addEventListener("beforeprint", function () {
+    if (_printing) return;  // guard against multi-fire (Chrome print preview)
+    _printing = true;
+    _stashOpen = [];
+    document.querySelectorAll("details:not([open])").forEach(function (d) {
+      _stashOpen.push(d);
+      d.open = true;
+    });
+  });
+  window.addEventListener("afterprint", function () {
+    _stashOpen.forEach(function (d) { if (d.isConnected) d.open = false; });
+    _stashOpen = [];
+    _printing = false;
+  });
+
+  // --- Feature 3: TOC scrollspy -----------------------------------------
+  var tocLinks = [].slice.call(document.querySelectorAll("nav.toc a"));
+  var headings = tocLinks.map(function (a) {
+    var id = a.getAttribute("href").replace(/^#/, "");
+    return document.getElementById(id);
+  }).filter(Boolean);
+  if (headings.length && typeof IntersectionObserver !== "undefined") {
+    var linkById = new Map();
+    headings.forEach(function (h, i) { linkById.set(h.id, tocLinks[i]); });
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (en) {
+        if (!en.isIntersecting) return;
+        tocLinks.forEach(function (l) { l.classList.remove("active"); });
+        var lk = linkById.get(en.target.id);
+        if (lk) lk.classList.add("active");
+      });
+    }, { rootMargin: "-15% 0px -75% 0px" });
+    headings.forEach(function (h) { io.observe(h); });
+  }
+
+  // --- Feature 1: Long-code auto-collapse -------------------------------
+  var COLLAPSE_THRESHOLD = 30;
+
+  function wrapCodeCard(pre, openByDefault) {
+    if (!pre || pre.closest("details.code-card")) return;
+    var code = pre.querySelector("code");
+    if (!code) return;
+    var lines = code.textContent.replace(/\n+$/, "").split("\n").length;
+    var det = document.createElement("details");
+    det.className = "code-card";
+    det.open = openByDefault;
+    var sum = document.createElement("summary");
+    function updateSummary() {
+      sum.textContent = (det.open ? "▾ Collapse code · " : "▸ Expand code · ") + lines + " lines";
+    }
+    updateSummary();
+    det.addEventListener("toggle", updateSummary);
+    pre.parentNode.insertBefore(det, pre);
+    det.appendChild(sum);
+    det.appendChild(pre);
+  }
+
+  // Honor explicit per-block flags first.
+  document.querySelectorAll("pre[data-collapse]").forEach(function (pre) {
+    var flag = pre.getAttribute("data-collapse");
+    if (flag === "collapsed") wrapCodeCard(pre, false);
+    // "open" → leave fully expanded, do not wrap.
+  });
+  // Then auto-wrap long unflagged blocks.
+  document.querySelectorAll("pre > code").forEach(function (code) {
+    var pre = code.closest("pre");
+    if (!pre || pre.closest("details") || pre.hasAttribute("data-collapse")) return;
+    var lines = code.textContent.replace(/\n+$/, "").split("\n").length;
+    if (lines >= COLLAPSE_THRESHOLD) wrapCodeCard(pre, false);
+  });
+
+  // --- Feature 10: Figure lightbox --------------------------------------
+  var lightbox = document.getElementById("figure-lightbox");
+  if (lightbox) {
+    var lbImg = lightbox.querySelector("img");
+    var lbCap = lightbox.querySelector("figcaption");
+    var lbClose = lightbox.querySelector(".lb-close");
+    function openLightbox(srcImg) {
+      lbImg.src = srcImg.src;
+      lbImg.alt = srcImg.alt || "";
+      var cap = srcImg.closest("figure") ? srcImg.closest("figure").querySelector("figcaption") : null;
+      lbCap.textContent = cap ? cap.textContent : "";
+      lbCap.hidden = !cap;
+      if (typeof lightbox.showModal === "function") lightbox.showModal();
+      else lightbox.hidden = false;
+    }
+    function closeLightbox() {
+      if (typeof lightbox.close === "function") lightbox.close();
+      else lightbox.hidden = true;
+    }
+    document.querySelectorAll("main figure img, main > p > img").forEach(function (img) {
+      if (img.closest("dialog")) return;
+      img.style.cursor = "zoom-in";
+      img.addEventListener("click", function () { openLightbox(img); });
+    });
+    if (lbClose) lbClose.addEventListener("click", closeLightbox);
+    lightbox.addEventListener("click", function (e) {
+      // Backdrop click closes; clicks inside .lb-inner do not bubble here.
+      if (e.target === lightbox) closeLightbox();
+    });
+  }
+
+  // --- Feature 2: Paper popover -----------------------------------------
+  var PAPERS = window.PAPER_REGISTRY || {};
+  var pop = document.getElementById("cite-pop");
+  var popContent = pop ? pop.querySelector(".cp-content") : null;
+  var popClose = pop ? pop.querySelector(".cp-close") : null;
+  var popTrigger = null;
+
+  function showPopover(el) {
+    var key = el.dataset.ref;
+    var info = PAPERS[key];
+    if (!info || !pop || !popContent) return;
+    popContent.innerHTML =
+      '<div class="cp-title" id="cite-pop-title">' + escapeHtml(info.title || key) + '</div>' +
+      (info.authors
+        ? '<div class="cp-meta">' + escapeHtml(info.authors) +
+            (info.date ? ' · ' + escapeHtml(info.date) : '') +
+            (info.inst ? ' · ' + escapeHtml(info.inst) : '') + '</div>'
+        : '') +
+      (info.key ? '<div class="cp-key">' + escapeHtml(info.key) + '</div>' : '') +
+      (info.arxiv
+        ? '<a class="cp-link" href="https://arxiv.org/abs/' + encodeURIComponent(info.arxiv) +
+          '" target="_blank" rel="noopener">arXiv ' + escapeHtml(info.arxiv) + ' ↗</a>'
+        : '');
+    var r = el.getBoundingClientRect();
+    pop.hidden = false;  // unhide first so offsetHeight is measurable
+    var margin = 16;
+    var popWidth = Math.min(360, Math.max(0, window.innerWidth - margin * 2));
+    var popHeight = Math.min(pop.offsetHeight || 200, Math.max(0, window.innerHeight - margin * 2));
+    pop.style.left = Math.max(margin, Math.min(r.left, window.innerWidth - popWidth - margin)) + "px";
+    pop.style.top = Math.max(margin, Math.min(r.bottom + 8, window.innerHeight - popHeight - margin)) + "px";
+    popTrigger = el;
+    if (popClose) popClose.focus();
+  }
+  function hidePopover() {
+    if (pop) pop.hidden = true;
+    if (popTrigger) popTrigger.focus();
+    popTrigger = null;
+  }
+  document.querySelectorAll("[data-ref]").forEach(function (el) {
+    el.setAttribute("tabindex", "0");
+    el.setAttribute("role", "button");
+    el.addEventListener("click", function (e) { e.stopPropagation(); showPopover(el); });
+    el.addEventListener("keydown", function (e) {
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); showPopover(el); }
+    });
+  });
+  if (popClose) popClose.addEventListener("click", hidePopover);
+  document.addEventListener("click", function (e) {
+    if (pop && !pop.hidden && !pop.contains(e.target) && !e.target.matches("[data-ref]")) hidePopover();
+  });
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape" && pop && !pop.hidden) hidePopover();
+  });
+
+  // --- Feature 7: Blog-mode active-H2 highlight (opt-in) ----------------
+  if (document.body.classList.contains("aris-blog")) {
+    var h2s = [].slice.call(document.querySelectorAll("main h2"));
+    if (h2s.length && typeof IntersectionObserver !== "undefined") {
+      var io2 = new IntersectionObserver(function (entries) {
+        entries.forEach(function (en) {
+          if (en.isIntersecting) {
+            h2s.forEach(function (h) { h.classList.remove("aris-active-h2"); });
+            en.target.classList.add("aris-active-h2");
+          }
+        });
+      }, { rootMargin: "-15% 0px -75% 0px" });
+      h2s.forEach(function (h) { io2.observe(h); });
+    }
+  }
+})();
+</script>
+</body>
+</html>
