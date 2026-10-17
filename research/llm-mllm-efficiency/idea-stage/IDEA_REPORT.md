@@ -11,7 +11,7 @@
 > - 没有 GPU，Phase 5 pilot 全部 **SKIPPED: needs GPU**。
 
 ## Executive Summary
-**最佳 idea**：**C1+C5 "压缩吃掉冗余"**。检验长度惩罚 RL（ThinkPrune / L1 / AdaptThink / LC-R1）是否删掉了投机解码和 KV 驱逐赖以生效的冗余：在投机解码下，token 数压缩是否高估了 wall-clock 节省？随机驱逐在压缩后的 trace 上是否不再免费？新颖性 7/10（PROCEED），独立评审给 PROCEED（模拟分 5→6/10）。完全基于公开 checkpoint 做推理，第一个闸门实验只需约 1.5 GPU-h，正反结果都能发表。**备选**：C2，检验 Thinking MLLM 是否对 prefill 视觉 token 剪枝更脆弱（6/10，PROCEED）。**淘汰**：C4（混合架构 KV 驱逐），模型上下文长度不够、收益小，且已被同期工作占据。**下一步**：在有 GPU 的环境中跑 C1 的 P0 判别实验（位置匹配 + 固定窗口的 n-gram τ）；同时配置 Codex 跨模型评审，补齐 ARIS 的 acceptance receipt（本次评审都是同家族 Claude，evidence gate 为 BLOCKED，见文末）。
+**最佳 idea**：**C1+C5 "压缩吃掉冗余"**。检验长度惩罚 RL（ThinkPrune / L1 / AdaptThink / LC-R1）是否删掉了投机解码和 KV 驱逐赖以生效的冗余：在投机解码下，token 数压缩是否高估了 wall-clock 节省？随机驱逐在压缩后的 trace 上是否不再免费？新颖性 7/10（PROCEED），独立评审给 PROCEED（模拟分 5→6/10）。完全基于公开 checkpoint 做推理，第一个闸门实验只需约 1.5 GPU-h，正反结果都能发表。**全文核对（用户提供 PDF）**：Random Attention 确认没有测过压缩模型，并在附录 H 中明确写着"文本冗余是推断出来的，不是测出来的"，C1+C5 因此**加强**。DSTP 附录 G 已经有 Qwen3-VL-4B-Thinking 的剪枝结果，算出的 Thinking / Instruct 损失比为 0.55–1.26，与 C2 的原假设方向相反，C2 因此**降级为候选**。新的备选是 C3（MoE 剪枝 vs 合并看 pass@k，需先做新颖性检查）。**淘汰**：C4（混合架构 KV 驱逐），模型上下文长度不够、收益小，且已被同期工作占据。**下一步**：在有 GPU 的环境中跑 C1 的 P0 判别实验（位置匹配 + 固定窗口的 n-gram τ）；同时配置 Codex 跨模型评审，补齐 ARIS 的 acceptance receipt（本次评审都是同家族 Claude，evidence gate 为 BLOCKED，见文末）。
 
 <a id="literature-landscape"></a>
 ## Literature Landscape
@@ -328,7 +328,9 @@ Also seen: s1 2501.19393, TALE 2412.18547, Chain of Draft 2502.18600, LC-R1 2506
 - **Contribution type**: empirical + diagnostic
 - **Pilot**: SKIPPED（无 GPU）
 
-### 🥈 Idea 2（评审后升为第二）: C2 — Thinking MLLM 对视觉 token 剪枝更脆弱，且脆弱程度随思考长度增长
+### ⬇️ C2（评审后曾升为第二；全文核对后降级为候选）— Thinking MLLM 对视觉 token 剪枝更脆弱，且脆弱程度随思考长度增长
+
+> DSTP 附录 G Table II 算出的 Thinking / Instruct 损失比为 0.55–1.26，与原假设方向相反，见 [Full-text Verification](#full-text-verification)。
 - **Method**:
   1. 用 Qwen3-VL-{2,4,8}B 的 Instruct / Thinking 匹配对。
   2. 在 prefill 时一次性剪枝（随机、FastV、DART、下采样），保留 50/25/11%。
@@ -485,26 +487,76 @@ Also seen: s1 2501.19393, TALE 2412.18547, Chain of Draft 2502.18600, LC-R1 2506
 
 ---
 
-## 最终结论
+<a id="full-text-verification"></a>
+## Full-text Verification（用户提供的全文 PDF，2026-10-17）
 
-### 🏆 Idea 1: C1+C5 "压缩吃掉冗余" — RECOMMENDED
-- Pilot: SKIPPED（无 GPU），第一个闸门是约 1.5 GPU-h 的 P0
-- Novelty: PROCEED 7/10（最近的工作：Random Attention 2609.03430、R-KV、ReCo 2608.04771、DREAM-R 2605.28678）
+评审要求的"开工前先读全文"已经完成：Random Attention（arXiv 2609.03430v2，24 页）和 DSTP（arXiv 2604.12358v2，31 页）都逐页读过，包括附录。以下事实都直接引自全文，不再是检索摘要。
+
+### Random Attention 2609.03430 → 对 C1+C5 是**利好**
+| 核对项 | 全文事实 | 对 C1+C5 的含义 |
+|---|---|---|
+| 是否测过压缩 / 简洁模型 | **没有。** 只测了 Qwen3-4B / 14B / 32B 和 Phi-4-reasoning；任务为 MATH500、GPQA-D、AIME、HMMT、LiveCodeBench（§4.1） | 核心空白确认存在 |
+| 文本层面冗余 | 附录 H 原话："Text-level redundancy is itself **inferred, not measured**"。作者也说"We have **not measured** how often real reasoning traces contain such [once-stated] facts" | C5 正好测量作者自己列为"未测量"的机制，定位从"结果可预判"升级为"直接检验 RA 的机制性主张" |
+| 两层冗余 | shared draw（所有头共用同一组随机位置，去掉跨头多样性）在 Qwen3-4B MATH500 上得 0.871 / 0.788，逐头随机为 0.874 / 0.789（K=1024 / 512，附录 D）。作者结论：在他们的 trace 上，**文本层面的冗余在起主要作用，跨头冗余不是必需的**。但这个对照**只在 MATH500 上做过**，探针也只在 Qwen3-4B 上做过 | 给 C5 一个干净、可预注册的判别实验（见下面的 P1） |
+| 只说一次的事实 | 一个只说一次、57 轮驱逐之后才被问到的口令：Random Attention 找回率 0.000，R-KV 0.836（Table 3） | 预测：压缩后的 trace 里"只说一次"的事实变多，R-KV 等内容感知方法相对随机的优势应当出现（P2） |
+| 驱逐会拉长生成 | Table 7：例如 Qwen3-4B MATH500，full 5.3K → Random Attention 7.1K → SnapKV 14.2K token | C1 新增一个直接测量项：驱逐带来的长度反弹在压缩模型上是否更大（可能把压缩省下的 token 吃回去） |
+| 预算设定 | 每个任务固定 K，约为典型 trace 的 4× 压缩（MATH500 K=1024，AIME / HMMT K=4096），并保护整个 prompt | 压缩模型的 trace 更短，必须用**相对预算**（压缩倍数对齐）。评审对"预算公平性"的担忧可以按 RA 自己的口径解决 |
+| 代码 | 公开（SalesforceAIResearch/Random-Attention），基于 VaSE 的 HF 引擎，并提供 TriAttention 的 vLLM 插件 | R1-Distill-Qwen 系模型可以直接复用 |
+| 作者列出的未来工作 | 长 prompt 的预算、MLA / 混合架构、"随机 + 少量内容信号"的混合策略。**没有提到简洁 / 压缩模型** | 被抢先的风险中等 |
+
+**C5 据此修订后的预注册预测**（全部在 RA 自己的实验框架内，不新增任何模块）：
+- **P1（跨头冗余变成必需）**：冗长模型上 shared draw ≈ 逐头随机（复现 RA 的 0.871 vs 0.874）；压缩模型上 shared draw **显著低于**逐头随机。这直接回应了评审"逐头冗余不受压缩影响、会限制效应大小"的担忧：shared-draw 这一组恰好隔离出文本层面的冗余。
+- **P2（内容信号重新有用）**：压缩模型上 R-KV 相对 Random Attention 的差距由负或零变为正，并且与直接测得的"只说一次的事实比例"相关。
+- **P3（直接测量文本冗余）**：统计"后来被用到的中间值在 trace 中被复述的次数"，补上 RA 说的"inferred, not measured"。
+- **反面结果同样有信息量**：如果压缩模型上 shared draw 仍然 ≈ 逐头随机，并且随机驱逐仍然打平，就说明文本冗余**不是**长度惩罚 RL 会删掉的那类冗余。这会否定 RA 的机制解释在压缩模型上的适用性。
+
+### DSTP 2604.12358 → 对 C2 是**打击**（claim 1 已被现有数据部分覆盖，且方向相反）
+| 核对项 | 全文事实 |
+|---|---|
+| 是否有 Thinking 结果 | **有。** 附录 G 的 Table II 测了 Qwen3-VL-4B-Thinking 和 InternVL3.5-8B-Thinking，但只有 FastV、33.3% 保留率、MathVerse / MMMU-Pro 两个数据集，正文没有讨论 Instruct 与 Thinking 的差异 |
+| 设置 | greedy 解码，max_new_tokens=4096（附录 H），没有 both-correct 筛选，也没有重采样对照 |
+| Instruct 的输出长度 | Table 4：Qwen3-VL-4B（Instruct）在 MathVerse 上平均输出 **2419 token**（FastV 剪枝后 2931）。**"Instruct 是短回答"这一前提不成立**，它本身已经在写长 CoT |
+| 晚期证据 | 附录 D 的 Fig. III：在 VMR 任务上，注意力偏移事件在生成进度 60–80% 和 80–100% 区间仍分别占 0.21 和 0.18。但这只是注意力相似度，不是因果测量 |
+
+**用 DSTP 自己的数字算出的 Thinking / Instruct 相对损失比**（FastV 33.3%）：
+
+| 模型 | 数据集 | Instruct 保留率 | Thinking 保留率 | 损失比（Thinking / Instruct） |
+|---|---|---|---|---|
+| Qwen3-VL-4B | MathVerse | 52.6%（32.23 / 61.29） | 55.2%（40.28 / 73.01） | **0.95** |
+| Qwen3-VL-4B | MMMU-Pro | 51.6%（19.41 / 37.63） | 73.5%（29.77 / 40.51） | **0.55** |
+| InternVL3.5-8B | MathVerse | 51.4%（21.57 / 42.00） | 38.9%（18.48 / 47.46） | 1.26 |
+| InternVL3.5-8B | MMMU-Pro | 48.1%（18.96 / 39.42） | 54.8%（20.63 / 37.68） | 0.87 |
+
+→ 4 个格子里没有一个达到评审的 kill 线（≥1.3），而在 Qwen3-VL 上，Thinking 反而损失**更小**。需要注意：这只是一个预算、一种剪枝方法、greedy 解码、4096 上限，而 Thinking 模型可能被截断，也没有任何对照。所以它不是对 C2 的正式否定，但**"Thinking 损失 2–3 倍"这个原假设几乎可以放弃**。按 ARIS 的判定规则：C2 claim 1 的数据已经包含在一篇具名论文（DSTP Table II）里，只是没有被讨论。
+
+**C2 的处置**：从 BACKUP **降级为候选**。仍然有价值的部分只剩：(a) 用晚期视觉 KV mask 做因果检验；(b) 在同一 checkpoint 内扫思考预算；(c) 证据所指的反方向假设："更长的思考是否补偿了被剪掉的视觉 token"（Qwen3-VL 的数据暗示是）。但 (c) 的近邻 VisionPulse 2605.31457 已报告"剪枝后模型会写更长的 trace 来补偿"，新颖空间进一步收窄。
+
+---
+
+## 最终结论（全文核对后更新）
+
+### 🏆 Idea 1: C1+C5 "压缩吃掉冗余" — RECOMMENDED（全文核对后**加强**）
+- Pilot: SKIPPED（无 GPU），第一个闸门是约 1.5 GPU-h 的 P0（SD 部分）。C5 部分新增一个闸门：在一个冗长 / 压缩模型对上跑逐头随机 vs shared draw vs R-KV（用 RA 的公开代码，约 3 GPU-h）
+- Novelty: PROCEED 7/10。全文确认 Random Attention 没有测过压缩模型，并明确把文本冗余列为"未测量"
 - Reviewer: PROCEED，5 → 6/10（同家族评审）
-- 下一步：P0 → P1/P2 → （promote 后）P3–P6
+- 下一步：P0 → C5 闸门 → P1/P2 → （promote 后）P3–P6
 
-### 🥈 Idea 2: C2 Thinking MLLM 剪枝 — BACKUP
-- 先花 0 GPU 查 DSTP 的结果表 → 做约 2 GPU-h 的晚期 mask 因果测试
-- Novelty: PROCEED 6/10；Reviewer: PROCEED，5 → 6/10
+### ⬇️ C2 Thinking MLLM 剪枝 — 降级为候选
+- DSTP 附录 G Table II 已经包含 Thinking 模型的结果，算出的损失比为 0.55–1.26，与原假设方向相反（见上）。只有晚期 mask 因果检验和思考预算扫描仍然开放
+
+### 🥈 新的 BACKUP 候选：C3（MoE 剪枝 vs 合并看 pass@k）
+- triage 排第 4（N7 / I8 / F6），REAP 和 REAM 都只用 greedy 评测。**还没有做深度新颖性检查**，启用前需要先跑 `/novelty-check`
 
 ### 低成本附带 pilot：C9（PTQ 是否抹掉 RL 增量，约 1.5 GPU-h）
-### 备选：C3（MoE 剪枝 vs 合并看 pass@k）、C7+C8（随机基线诊断）、C12（多轮视觉 KV）
+### 其余候选：C7+C8（随机基线诊断）、C12（多轮视觉 KV）
 
 ## Refined Proposal
 - `/research-refine-pipeline` **本次没有运行**：用户只要求文献调研和选题，而且没有 GPU、没有跨模型评审，`FINAL_PROPOSAL.md` 不存在。下一步可以对 C1+C5 运行 `/research-refine-pipeline`，生成 `refine-logs/FINAL_PROPOSAL.md` 和 `EXPERIMENT_PLAN.md`。
 
 ## Next Steps
-- [ ] 人工复核关键论文的全文：Random Attention 2609.03430（确认没有测过简洁模型）、DSTP 2604.12358（确认有没有 Thinking 行）、DREAM-R 2605.28678
+- [x] 人工复核关键论文的全文：Random Attention 2609.03430（✅ 确认没有测过简洁模型）、DSTP 2604.12358（⚠️ 附录 G 有 Thinking 结果，见 [Full-text Verification](#full-text-verification)）
+- [ ] 复核 DREAM-R 2605.28678 全文（C1 的部分先例）
+- [ ] 对 C3 跑 `/novelty-check`（新的 BACKUP 候选）
 - [ ] 配置跨模型评审（Codex：`npm i -g @openai/codex && codex login`，然后 `claude mcp add codex …`），对 novelty-check 和 research-review 补一轮 GPT 评审，拿到 ARIS 的 acceptance receipt
 - [ ] 在有 GPU 的环境中跑 C1 的 P0（约 1.5 GPU-h）和 C2 的晚期 mask 测试（约 2 GPU-h），可选再跑 C9
 - [ ] 对通过闸门的 idea 运行 `/research-refine-pipeline` → `/experiment-bridge` → `/auto-review-loop`

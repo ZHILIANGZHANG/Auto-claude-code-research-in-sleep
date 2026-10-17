@@ -12,6 +12,15 @@
 2. 在 7B、batch 1 / 32 / 128 下，实测"有效压缩比"（wall-clock 比 / token 比）在开启 SD 时差于关闭 SD 时。必须同时考虑 KV 读取代价降低带来的反向效应（Kinetics）。
 3. 在相同随机基线精度下，压缩模型上"随机 vs R-KV / SnapKV"的驱逐差距扩大，且在 ≥6 个模型点上与 EAGLE / drafter τ 的损失相关（不用 n-gram τ，避免循环论证）。
 
+### C5 的预注册预测（全文核对 Random Attention 2609.03430v2 之后加入）
+RA 只测了 Qwen3-4B/14B/32B 和 Phi-4-reasoning，并在附录 H 中写明"text-level redundancy is inferred, not measured"。shared draw 对照（所有头共用随机位置）只在 Qwen3-4B MATH500 上做过：0.871 vs 逐头 0.874（K=1024）。
+- **P1**：冗长模型上 shared draw ≈ 逐头随机；压缩模型上 shared draw 显著低于逐头随机（跨头冗余从"非必需"变成"必需"）。
+- **P2**：压缩模型上 R-KV 相对 Random Attention 的差距转为正值，且与"只说一次的事实比例"相关（RA Table 3：只说一次的口令 R-KV 0.836 vs RA 0.000）。
+- **P3**：直接测量文本冗余，即后来被用到的中间值的复述次数。
+- **附加测量**：驱逐导致的长度反弹（RA Table 7：Qwen3-4B MATH500 full 5.3K → RA 7.1K token）在压缩模型上是否更大。
+- **预算口径**：沿用 RA 的设定（K 约为典型 trace 的 4× 压缩、保护整个 prompt），压缩模型按各自的典型长度设定相对 K，同时报告绝对 K。
+- **代码**：SalesforceAIResearch/Random-Attention（VaSE HF 引擎，以及 TriAttention 的 vLLM 插件）。
+
 ## Method Summary
 选同一父模型的冗长 → 压缩配对：R1-Distill-Qwen-1.5B → `…-thinkprune-iter2k`；DeepScaleR-1.5B → L1-1.5B-Max；R1-Distill-Qwen-7B → LC-R1-7B / AdaptThink-7B（按 think / no-think 分层）。在 MATH-500 / AIME 上以 T=0.6 采样 trace，一次前向拿到 target 的 log-prob，离线计算期望接受长度：prompt-lookup / suffix 和 R1-Distill-1.5B drafter，按绝对位置分桶 + 固定 2K 窗口 + 不匹配三种口径。L1 在同一权重下扫多个目标长度，作为模型内对照。
 
@@ -39,7 +48,9 @@ drafter 方面：按 token 数匹配，在各模型自己的 trace 上训练 EAG
 
 ## Status
 - [x] Idea selected
+- [x] 关键先例全文核对（Random Attention：确认没有测过压缩模型）
 - [ ] P0 判别实验
+- [ ] C5 闸门：一个冗长 / 压缩模型对上，逐头随机 vs shared draw vs R-KV（约 3 GPU-h）
 - [ ] Baseline reproduced（Random Attention 代码，SD 基线）
 - [ ] 7B trace + 离线 τ
 - [ ] EAGLE-3 token 匹配重蒸馏

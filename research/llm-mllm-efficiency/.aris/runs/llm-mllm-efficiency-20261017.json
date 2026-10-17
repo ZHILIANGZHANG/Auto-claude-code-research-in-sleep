@@ -6,7 +6,7 @@
     "provisional_advances": false
   },
   "created": "2026-10-17T14:37:05Z",
-  "updated": "2026-10-17T15:08:51Z",
+  "updated": "2026-10-17T15:19:27Z",
   "gates": {
     "idea-discovery-evidence": {
       "verdict": "BLOCKED",
@@ -15,7 +15,7 @@
         "research-review review evidence missing (status=done)",
         "research-refine-pipeline evidence missing (status=skipped)"
       ],
-      "updated": "2026-10-17T15:08:51Z"
+      "updated": "2026-10-17T15:19:27Z"
     }
   },
   "phases": [
