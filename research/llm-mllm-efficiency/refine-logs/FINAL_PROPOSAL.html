@@ -1,0 +1,771 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Final Proposal: 压缩吃掉了冗余 — CoT 长度压缩与解码加速的隐性冲突</title>
+
+<meta name="generator" content="ARIS render-html (academic, v1)">
+<meta name="aris:source-path" content="refine-logs/FINAL_PROPOSAL.md">
+<meta name="aris:source-sha256" content="2214e68b7a2aaa56b67452375cd41db6c4dd75b52d25229c71ab4c2980e0aa92">
+<meta name="aris:generated-at" content="2026-10-17 16:02 UTC">
+
+<!-- offline mode: MathJax + highlight.js skipped; math and code blocks render as plain text -->
+
+<style>
+:root {
+  --bg: #fdfcf7;
+  --bg-soft: #f4f1ea;
+  --bg-code: #f8f5ec;
+  --ink: #1a1a1a;
+  --ink-soft: #4a4a4a;
+  --ink-muted: #6b6b6b;
+  --primary: #1a4a8c;
+  --primary-soft: #2d6cb8;
+  --accent: #b8390e;
+  --warn: #b45309;
+  --warn-bg: #fef3c7;
+  --info-bg: #dbeafe;
+  --good-bg: #d1fae5;
+  --good: #065f46;
+  --bad-bg: #fee2e2;
+  --bad: #991b1b;
+  --border: #d6d0c0;
+  --border-soft: #e8e3d5;
+}
+
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+
+body {
+  font-family: "Source Serif Pro", "Source Serif 4", "Crimson Pro", "Georgia", "Songti SC", "STSong", serif;
+  line-height: 1.65;
+  color: var(--ink);
+  background: var(--bg);
+  margin: 0;
+  padding: 0;
+  font-size: 16px;
+}
+
+.layout {
+  max-width: 1280px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  gap: 48px;
+  padding: 40px 32px;
+}
+
+nav.toc {
+  position: sticky;
+  top: 24px;
+  align-self: start;
+  font-size: 13px;
+  max-height: calc(100vh - 48px);
+  overflow-y: auto;
+  border-right: 1px solid var(--border-soft);
+  padding-right: 16px;
+}
+nav.toc h3 {
+  margin: 0 0 12px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ink-muted);
+  font-weight: 600;
+}
+nav.toc ol { list-style: none; padding: 0; margin: 0; counter-reset: toc; }
+nav.toc ol li { margin: 5px 0; counter-increment: toc; }
+nav.toc ol li::before { content: counter(toc) ". "; color: var(--ink-muted); margin-right: 4px; }
+nav.toc a {
+  color: var(--ink-soft);
+  text-decoration: none;
+  border-bottom: 1px dotted transparent;
+}
+nav.toc a:hover { color: var(--primary); border-bottom-color: var(--primary); }
+nav.toc ul { list-style: none; padding-left: 14px; margin: 3px 0; font-size: 12px; }
+nav.toc ul li::before { content: "→ "; color: var(--border); }
+
+main { min-width: 0; }
+
+header.hero {
+  border-bottom: 3px double var(--primary);
+  padding-bottom: 24px;
+  margin-bottom: 32px;
+}
+header.hero .eyebrow {
+  color: var(--accent);
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+body.aris-blog header.hero .eyebrow {
+  font-family: inherit;
+  color: var(--ink-muted);
+  text-transform: none;
+  letter-spacing: 0.01em;
+  font-weight: 400;
+}
+header.hero h1 {
+  font-size: 32px;
+  line-height: 1.2;
+  margin: 0 0 12px;
+  color: var(--ink);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+header.hero .subtitle {
+  font-size: 16px;
+  color: var(--ink-soft);
+  margin: 0 0 8px;
+  font-style: italic;
+}
+header.hero .byline {
+  font-size: 14px;
+  color: var(--ink-soft);
+  margin: 0 0 20px;
+}
+header.hero .byline strong {
+  color: var(--ink);
+  font-weight: 600;
+}
+header.hero .meta {
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+  font-size: 12px;
+  color: var(--ink-muted);
+  border-top: 1px solid var(--border-soft);
+  padding-top: 14px;
+}
+header.hero .meta span strong { color: var(--ink-soft); }
+header.hero .meta code {
+  font-family: "JetBrains Mono", "SF Mono", "Menlo", "Consolas", monospace;
+  font-size: 11px;
+  background: var(--bg-soft);
+  padding: 1px 5px;
+  border-radius: 3px;
+  border: 1px solid var(--border-soft);
+}
+
+h2 {
+  font-size: 24px;
+  margin: 44px 0 14px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+  color: var(--ink);
+  font-weight: 700;
+}
+h2 .num { color: var(--primary); font-weight: 600; margin-right: 8px; }
+h3 { font-size: 19px; margin: 28px 0 10px; color: var(--primary); font-weight: 600; }
+h4 { font-size: 16px; margin: 20px 0 8px; color: var(--ink); font-weight: 600; }
+
+p { margin: 10px 0; }
+ul, ol { padding-left: 22px; margin: 10px 0; }
+ul li, ol li { margin: 4px 0; }
+ul li::marker { color: var(--primary); }
+
+strong { color: var(--accent); font-weight: 600; }
+em { color: var(--ink-soft); }
+
+a { color: var(--primary); }
+a:hover { color: var(--accent); }
+
+code:not(.hljs) {
+  font-family: "JetBrains Mono", "SF Mono", "Menlo", "Consolas", monospace;
+  font-size: 0.86em;
+  background: var(--bg-code);
+  padding: 1px 5px;
+  border-radius: 3px;
+  border: 1px solid var(--border-soft);
+  color: var(--accent);
+}
+
+pre {
+  background: #fafaf6;
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--primary);
+  padding: 0;
+  overflow-x: auto;
+  border-radius: 4px;
+  margin: 14px 0;
+}
+pre code, pre code.hljs {
+  background: transparent !important;
+  display: block;
+  padding: 14px 18px !important;
+  font-size: 13px;
+  line-height: 1.55;
+  font-family: "JetBrains Mono", "SF Mono", "Menlo", monospace;
+  color: var(--ink);
+}
+pre.diagram {
+  background: #f9f6ed;
+  border-left: 4px solid var(--accent);
+  font-size: 12.5px;
+  line-height: 1.4;
+}
+
+.callout {
+  margin: 16px 0;
+  padding: 12px 16px;
+  border-radius: 4px;
+  border-left: 4px solid;
+  font-size: 15px;
+}
+.callout-title {
+  font-weight: 600;
+  margin-bottom: 6px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.callout-info { background: var(--info-bg); border-left-color: var(--primary); }
+.callout-info .callout-title { color: var(--primary); }
+.callout-warn { background: var(--warn-bg); border-left-color: var(--warn); }
+.callout-warn .callout-title { color: var(--warn); }
+.callout-good { background: var(--good-bg); border-left-color: var(--good); }
+.callout-good .callout-title { color: var(--good); }
+.callout-bad { background: var(--bad-bg); border-left-color: var(--bad); }
+.callout-bad .callout-title { color: var(--bad); }
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 16px 0;
+  font-size: 14px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  overflow: hidden;
+}
+thead { background: var(--primary); color: white; }
+th, td {
+  text-align: left;
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--border-soft);
+  vertical-align: top;
+}
+th { font-weight: 600; font-size: 13px; letter-spacing: 0.02em; }
+tr:last-child td { border-bottom: none; }
+tbody tr:nth-child(even) { background: var(--bg-soft); }
+
+details.qa, details {
+  background: white;
+  border: 1px solid var(--border-soft);
+  border-radius: 6px;
+  margin: 10px 0;
+  padding: 0;
+}
+details summary {
+  cursor: pointer;
+  padding: 10px 14px;
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--primary);
+  list-style: none;
+  user-select: none;
+}
+details summary::-webkit-details-marker { display: none; }
+details summary::before {
+  content: "▸ ";
+  margin-right: 4px;
+  display: inline-block;
+  transition: transform 0.15s;
+}
+details[open] summary::before { transform: rotate(90deg); }
+details[open] summary { border-bottom: 1px solid var(--border-soft); }
+details > :not(summary) { padding: 10px 14px; }
+details p:first-of-type { margin-top: 8px; }
+
+mjx-container[display="true"] { margin: 12px 0 !important; }
+
+footer.aris-footer {
+  margin-top: 60px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
+  font-size: 12px;
+  color: var(--ink-muted);
+}
+footer.aris-footer a { color: var(--ink-muted); border-bottom: 1px dotted var(--border); }
+
+@media (max-width: 900px) {
+  .layout { grid-template-columns: 1fr; gap: 20px; padding: 20px 16px; }
+  nav.toc {
+    position: static;
+    max-height: none;
+    border-right: none;
+    border-bottom: 1px solid var(--border-soft);
+    padding-right: 0;
+    padding-bottom: 14px;
+  }
+  header.hero h1 { font-size: 24px; }
+  h2 { font-size: 20px; }
+}
+@media print {
+  nav.toc { display: none; }
+  .layout { grid-template-columns: 1fr; padding: 0; }
+  body { background: white; }
+  header.hero { border-bottom-color: var(--ink); }
+  #cite-pop, dialog.lightbox { display: none !important; }
+}
+
+/* --- P0 polish: TOC scrollspy active state ---------------------------- */
+nav.toc a.active {
+  color: var(--accent);
+  font-weight: 600;
+  border-bottom-color: var(--accent);
+}
+
+/* --- P0 polish: Long-code auto-collapse ------------------------------- */
+details.code-card {
+  margin: 14px 0;
+  background: #fafaf6;
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--primary);
+  border-radius: 4px;
+}
+details.code-card > summary {
+  cursor: pointer;
+  padding: 8px 14px;
+  color: var(--ink-soft);
+  font-size: 13px;
+  font-family: "JetBrains Mono", "SF Mono", monospace;
+  list-style: none;
+  user-select: none;
+}
+details.code-card > summary::-webkit-details-marker { display: none; }
+details.code-card > summary::before { content: none; }
+details.code-card > pre {
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-left: none;
+  border-radius: 0;
+}
+@media print {
+  details.code-card { border: 1px solid #ccc; background: white; }
+  details.code-card > summary { display: none !important; }
+  details.code-card > pre { border: 1px solid #ddd; border-radius: 4px; background: white; }
+}
+
+/* --- P0 polish: Paper popover ([[ref]] popups) ------------------------ */
+[data-ref] {
+  color: var(--primary);
+  border-bottom: 1px dotted var(--primary);
+  cursor: pointer;
+  white-space: nowrap;
+}
+[data-ref]:hover { background: rgba(26, 74, 140, 0.08); }
+#cite-pop {
+  position: fixed;
+  width: 360px;
+  max-width: calc(100vw - 32px);
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 14px 16px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  font-size: 13px;
+  line-height: 1.5;
+  z-index: 1000;
+}
+#cite-pop[hidden] { display: none; }
+#cite-pop .cp-title {
+  font-weight: 600;
+  color: var(--ink);
+  margin-bottom: 4px;
+  padding-right: 24px;
+}
+#cite-pop .cp-meta {
+  color: var(--ink-muted);
+  font-size: 12px;
+  margin-bottom: 6px;
+}
+#cite-pop .cp-key {
+  color: var(--accent);
+  font-style: italic;
+  margin-bottom: 8px;
+}
+#cite-pop .cp-link {
+  display: inline-block;
+  color: var(--primary);
+  font-weight: 500;
+}
+#cite-pop .cp-close {
+  position: absolute;
+  top: 6px;
+  right: 10px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 16px;
+  color: var(--ink-muted);
+}
+
+/* --- P0 polish: Figure lightbox (native <dialog>) --------------------- */
+dialog.lightbox {
+  border: none;
+  padding: 0;
+  background: rgba(0, 0, 0, 0.92);
+  width: 96vw;
+  height: 96vh;
+  max-width: 96vw;
+  max-height: 96vh;
+}
+dialog.lightbox::backdrop { background: rgba(0, 0, 0, 0.92); }
+dialog.lightbox .lb-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: 16px;
+  position: relative;
+}
+dialog.lightbox img {
+  max-width: 90vw;
+  max-height: 84vh;
+  object-fit: contain;
+  cursor: zoom-out;
+}
+dialog.lightbox figcaption {
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 14px;
+  text-align: center;
+  max-width: 700px;
+}
+dialog.lightbox .lb-close {
+  position: absolute;
+  top: 16px;
+  right: 20px;
+  background: none;
+  border: none;
+  color: white;
+  font-size: 28px;
+  cursor: pointer;
+}
+
+/* --- P0 polish: blog/talk mode active-H2 highlight (opt-in) ----------- */
+body.aris-blog h2 { scroll-margin-top: 24px; }
+body.aris-blog h2.aris-active-h2 {
+  background: linear-gradient(to right, rgba(26, 74, 140, 0.06), transparent);
+  border-radius: 4px;
+  padding-left: 12px;
+  margin-left: -12px;
+}
+</style>
+</head>
+<body class="">
+<div class="layout">
+
+<nav class="toc">
+  <h3>Contents</h3>
+  <ol>
+<li><a href="#problem-anchor">Problem Anchor</a>
+</li>
+<li><a href="#technical-gap">Technical Gap</a>
+</li>
+<li><a href="#method-thesis">Method Thesis</a>
+</li>
+<li><a href="#contribution-focus">Contribution Focus</a>
+</li>
+<li><a href="#定义测量协议">定义（测量协议）</a>
+</li>
+<li><a href="#模型矩阵">模型矩阵</a>
+</li>
+<li><a href="#claims">Claims</a>
+</li>
+<li><a href="#闸门-g0约-6-gpu-h第-1-周">闸门 G0（约 6 GPU-h，第 1 周）</a>
+</li>
+<li><a href="#computea100-80gb">Compute（A100-80GB）</a>
+</li>
+<li><a href="#named-risks">Named Risks</a>
+</li>
+</ol>
+</nav>
+
+<main>
+<header class="hero">
+  
+  <h1>Final Proposal: 压缩吃掉了冗余 — CoT 长度压缩与解码加速的隐性冲突</h1>
+  
+  
+  <div class="meta">
+    <span><strong>Source:</strong> <code>refine-logs/FINAL_PROPOSAL.md</code></span>
+    <span><strong>SHA256:</strong> <code>2214e68b7a2a</code></span>
+    <span><strong>Rendered:</strong> 2026-10-17 16:02 UTC</span>
+    
+  </div>
+</header>
+
+<h1 id="final-proposal-压缩吃掉了冗余--cot-长度压缩与解码加速的隐性冲突">Final Proposal: 压缩吃掉了冗余 — CoT 长度压缩与解码加速的隐性冲突</h1>
+<blockquote><p>research-refine 第 3 轮后定稿（2026-10-17）。评审分数 6.4 → 7.1 → 7.8（REVISE，已收敛）。评审建议停止打磨、直接跑 G0。 评审是同家族的 Claude 子代理，<strong>不是</strong> ARIS 要求的跨模型评审。 完整历史见 <code>REVIEW_SUMMARY.md</code> 和 <code>REFINEMENT_REPORT.md</code>。</p></blockquote>
+<h2 id="problem-anchor">Problem Anchor</h2>
+<ul><li><strong>Bottom-line problem</strong>: Efficient-reasoning work reports <em>token reduction</em> as its efficiency gain, and decode accelerators (speculative decoding, KV-cache eviction) report their own gains on <em>uncompressed</em> reasoners. In deployment they are stacked. We do not know whether these gains compose, because all three may draw on the same resource — the redundancy (restatement) inside long chains of thought.</li><li><strong>Must-solve bottleneck</strong>: There is no controlled measurement of how length-penalty RL changes (i) the draftability of the remaining trace and (ii) the robustness of signal-free KV eviction. The leading explanation for why random eviction works on reasoning (Random Attention 2609.03430: "the model restates what it still needs") is, in its authors' words, <em>inferred, not measured</em>.</li><li><strong>Non-goals</strong>: proposing a new length-compression RL method, a new drafter architecture, or a new eviction policy; long-input workloads; MLLMs; training any model larger than a draft model.</li><li><strong>Constraints</strong>: ≤ 8 × A100-80GB / RTX 4090-class; open checkpoints only; main experiments ≤ ~2 GPU-weeks; inference-dominant; target NeurIPS/ICML/ICLR (realistic: main borderline or *ACL Findings / MLSys).</li><li><strong>Success condition</strong>: On ≥ 3 verbose→compressed parent/child pairs at 2 scales, state with CIs (a) how much of the token saving survives as wall-clock saving once SD is on, decomposed into intrinsic draftability loss vs drafter mismatch vs attention-cost savings; and (b) whether signal-free eviction stays free on compressed traces — with a <em>directly measured</em> restatement statistic that predicts both — or a clean refutation of the shared-substrate story.</li></ul>
+<h2 id="technical-gap">Technical Gap</h2>
+<ul><li><strong>没人测过压缩前后的对照。</strong> 长度压缩论文（ThinkPrune、L1、AdaptThink、LC-R1、DLER、Laser）只报 token 数和准确率。SD 和驱逐论文只测没压缩过的模型。三者叠加的效果没有人做过受控测量。</li><li><p><strong>朴素比较有三个伪影：</strong></p>
+<ul><li>n-gram drafter 的接受长度天然随历史长度变好；</li><li>EAGLE 类方法的接受率随输出位置下降；</li><li>vLLM 的接受长度计数有已知问题。</li></ul></li><li><strong>wall-clock 还混入反向效应</strong>：上下文变短，注意力本身就变便宜（Kinetics）。</li><li><strong>我们的做法</strong>：不发明新方法，只造测量仪器，把这些伪影逐一隔离，并把 RA 所说的"复述"直接测出来。</li></ul>
+<h2 id="method-thesis">Method Thesis</h2>
+<p>长度惩罚 RL 删掉的是推理 trace 里的复述，而复述是投机解码和无信号 KV 驱逐共同依赖的资源。因此三者的收益不能相乘叠加：交互因子 <strong>S_c/S_v &lt; 1</strong> 且 <strong>E_c/E_v &lt; 1</strong>。并且一个直接测得的复述统计量 <strong>O_K</strong> 在模型内部同时预测这两类损失。</p>
+<h2 id="contribution-focus">Contribution Focus</h2>
+<ul><li><p><strong>主贡献</strong>：受控测量加机制解释。三件仪器：</p>
+<ul><li>τ / A：更新步进的位置匹配 tokens/step；</li><li>G：target 贪心可预测性；</li><li>O_K：复述统计量，按提及的联合存活计算。</li></ul></li><li><strong>辅贡献</strong>：组合报告规范，包括 S_c/S_v、E_c/E_v，以及 ρ 的对数可加三项分解。</li><li><strong>明确拒绝</strong>：新 drafter、新驱逐策略、压缩感知 RL（结论里只提一句 future work）；MLLM；长输入。</li><li><strong>frontier 原语</strong>：没有新的 frontier 组件。研究对象本身就是 RL 训练出的推理模型。生产级 drafter（EAGLE-3）以"父模型 head 复用到子模型"的形式纳入，属于标准 draft model，不是新架构。</li></ul>
+<h2 id="定义测量协议">定义（测量协议）</h2>
+<p><strong>(D1) τ 与 A：更新步进的 tokens/step</strong></p>
+<ul><li><strong>trace</strong>：T=0.6、top-p 0.95、最大 32K。</li><li><strong>步进规则</strong>：确定性 drafter，块长 k=4（同时报告 k=8）。从 t=0 开始，L = min(k, |草稿|, 草稿与 y_{t:} 的前缀匹配长度)，然后 t ← t + L + 1。</li><li><strong>为什么精确</strong>：在 coupling 下，拒绝时的修正 token 或全部接受后的 bonus token 都等于 y_{t+L}，所以步数与真实投机解码在该样本上的步数完全一致。</li><li><strong>汇总</strong>：每一步归入其起始位置所在的桶（0–1K / 1–2K / 2–4K / 4–8K）；τ = Σ tokens / Σ steps；k+1 个起始偏移取平均。</li><li><strong>A = τ − 1</strong>，即每步接受的 token 数。</li><li><p><strong>drafter 三种</strong>：</p>
+<ul><li>n-gram / suffix：查找范围 prompt + 最近 2048 token，同时报告不加窗口的版本；</li><li>1.5B 贪心 drafter（用于 7B target）：父 drafter 为主格，子 drafter 为次格；</li><li>target 自身贪心（G）。</li></ul></li><li><strong>EAGLE-3</strong>：在 G0 判定 promote 之后，加入一个用 7B 父模型训练的 head，用它测父模型和每个 7B 子模型。EAGLE 草稿依赖隐状态，所以在 trace 上 teacher forcing 跑 target 和 head 一次即可得到确定性草稿。</li><li><strong>CI</strong>：按题目做 bootstrap。</li></ul>
+<p><strong>(D2) G</strong> = 以 target argmax 为草稿时的 τ，同时报告逐桶熵。它衡量 target 侧的可预测性，不是任何 drafter 的上界。</p>
+<p><strong>(D3) SD 交互因子</strong></p>
+<ul><li>wall = Σ_steps c_m(ctx, b, k)，c 来自实测代价网格（父子同架构，每个尺寸测一次）。</li><li>ρ_SD = (τ_c / τ_v) · (c̄_v / c̄_c)</li><li>τ_c / τ_v = (G_c / G_v) × drafter 残差</li><li>ρ_noSD = c̄_v / c̄_c</li><li><strong>S_c / S_v = ρ_SD / ρ_noSD</strong>。b=1 时精确；b ∈ {32, 128} 时是模型，用端到端子集验证（误差 ≤ 10%）。</li><li>无损 SD 不改变准确率，所以 per-solved 归一化在 S_c / S_v 中抵消。ρ 本身另报一个 per-solved 版本。</li></ul>
+<p><strong>(D4) E 与内存</strong></p>
+<ul><li><p>E(m, π) = MATH500 上保持 ≥ 95% full 精度的最大相对压缩倍数。</p>
+<ul><li>先对"保持率 vs log 压缩倍数"做 isotonic 拟合，再取第一个穿越点。</li><li>网格：父模型 2/4/8/16×；子模型 2/4/8×，如果 8× 时仍 ≥ 95% 再加 16×。</li><li>删失时报告下界。若 E_v 删失而 E_c 有限，E_c/E_v 是假设方向上的单侧上界。</li><li>CI：按题目做 bootstrap。</li></ul></li><li><strong>full 精度</strong>：取 vLLM 结果。在 100 题 × 4 样本上与 HF full-KV 做等价性检验（TOST，|Δ| ≤ 1.5 分）；不通过则改用 HF full-KV。</li><li><strong>峰值 KV 的总节省</strong>（相对父模型 full KV）= (T_v / T_c) · E_c = [(T_v / T_c) · E_v] · (E_c / E_v)。时间积分的 KV 另行报告（∝ T_v²/2 vs T_c²/E_c）。</li><li><strong>驱逐导致的长度反弹</strong>作为一个报告量。</li></ul>
+<p><strong>(D5) O_K：复述统计量</strong></p>
+<ul><li><strong>事实</strong>：非平凡数值、规范化算式、赋值绑定，并记录每次提及的值 token 数 n_tok。</li><li><strong>单条目存活率 s_K(Δ)</strong>：以 harness 实测记录的曲线为主；解析校验式为 ((K − ℓ_p) / (K + r − ℓ_p))^{⌊u/r⌋ − ⌊m/r⌋}，若有保护 buffer 再减一轮。</li><li><strong>O_K(题 i, K)</strong> = 该模型 full-KV 样本上，复用事件 u 的 mean_u Π_m (1 − s_K(u − m)^{n_tok(m)}) 的均值。它是一个<strong>题目级</strong>预测量，在驱逐之前就能算出来。</li><li><strong>抽取质量</strong>：50 条 trace 上人工标注复用事件的精确率和召回率。</li></ul>
+<p><strong>(D6) 机制检验（主检验在模型内）</strong></p>
+<ul><li><p><strong>主回归</strong>：一个跨模型分层的逐样本 logistic 混合模型，以 <strong>shared-draw 这一组</strong>为主臂（它的存活模型与 O_K 完全一致）：</p>
+<ul><li>correct_{i,s} ~ policy × O_K(i, K) + log 长度 + 预算 FE + 模型 FE + 通过率_i + (1 | 题目)</li><li>policy 取 {重采样对照, shared-draw}，通过率来自独立的重采样样本。</li><li><strong>机制主张</strong> = policy × O_K 交互项为负。</li><li>逐头随机和 R-KV 作为次要臂。报告 O_K 与 log 长度之间的 VIF。</li></ul></li><li><strong>τ 一侧</strong>：逐 trace 回归 drafter τ / G ~ O_K(4×) + log 长度 + 模型 FE。不使用 n-gram，避免循环论证。</li></ul>
+<p><strong>(D7) P1：存活模型判别（预注册，不作为 Claim 1 的证据）</strong></p>
+<ul><li><p>比较 E(shared) / E(per-head) 在父子模型之间的变化：</p>
+<ul><li>子模型上 shared &lt; per-head → 跨头并集确实有用，O_K 对逐头一组是保守的（损失上界）；</li><li>两者相同 → 单次抽样的 O_K 就是正确的统计量。</li></ul></li><li>shared-draw 必须在<strong>所有层、所有 KV 头</strong>之间共用位置，需在 RA 代码中确认，否则自己实现。</li></ul>
+<p><strong>(D8) 预注册控制</strong></p>
+<ul><li>循环 / 截断过滤：一个 50-token 片段重复 ≥ 3 次，或触达 32K，即标记，所有指标报告含 / 不含两版。</li><li>位置桶只比较两个模型都覆盖到的题，并报告 N。</li><li>both-correct 定义为 ≥ 3/4 次答对，并加重采样对照。</li><li>AdaptThink 按 think / no-think 分层。</li></ul>
+<h2 id="模型矩阵">模型矩阵</h2>
+<table><thead><tr><th>尺度</th><th>父</th><th>子（主网格）</th><th>附录</th></tr></thead><tbody><tr><td>1.5B</td><td>R1-Distill-Qwen-1.5B</td><td><code>nvidia/DLER-R1-1.5B-Research</code>、<code>Shiyu-Lab/DeepSeek-R1-Distill-Qwen-1.5B-thinkprune-iter2k</code>、<code>zx10086/LCR1_1.5B</code></td><td><code>THU-KEG/AdaptThink-1.5B-delta0.05</code></td></tr><tr><td>7B</td><td>R1-Distill-Qwen-7B</td><td><code>nvidia/DLER-R1-7B-Research</code>、<code>zx10086/LCR1_7B</code>、<code>hkust-nlp/Laser-D-L4096-7B</code></td><td><code>THU-KEG/AdaptThink-7B-delta0.05</code></td></tr><tr><td>同权重剂量</td><td>DeepScaleR-1.5B-Preview</td><td><code>l3lab/L1-Qwen-1.5B-Max</code>，prompt 预算 {512, 1K, 2K, 4K}</td><td></td></tr></tbody></table>
+<p>ID 来自检索摘录，下载前需复核。DLER 采用 NSCLv1 许可，仅限研究用途。</p>
+<h2 id="claims">Claims</h2>
+<ul><li><p><strong>Claim 1（主）</strong>：压缩吃掉了 SD 和随机驱逐共同依赖的冗余。</p>
+<ul><li><p>证据：</p>
+<ul><li>位置匹配下 A 和 G 下降；</li><li>E_c / E_v &lt; 1（shared 和逐头两组都看）；</li><li>P2：子模型上 R-KV 相对随机的优势上升；</li><li>主回归中 policy × O_K 交互项显著为负。</li></ul></li><li>反证路径：A 不降且 E 不降，则结论为"三者可以相乘叠加"，同样成文。</li></ul></li><li><strong>Claim 2（辅）</strong>：S_c / S_v = ρ_SD / ρ_noSD &lt; 1，并给出三项分解。ρ_SD &lt; 1 单独报告，作为更强的部署结论。</li></ul>
+<h2 id="闸门-g0约-6-gpu-h第-1-周">闸门 G0（约 6 GPU-h，第 1 周）</h2>
+<ul><li><p><strong>G0-SD</strong>：R1-1.5B → ThinkPrune-iter2k，以及 DeepScaleR → L1-Max；MATH500 中 200 题 × 4 样本；离线计算。</p>
+<ul><li><strong>判定指标</strong>：n-gram（窗口 2048）的 A，按覆盖受限的匹配桶做 token 加权汇总。G 同时报告；"每个桶方向一致"作为次要判据。</li><li><strong>Kill</strong>：两个对的下降都 &lt; 10%，<strong>并且</strong> L1 的长度扫描是平的。</li><li><strong>Promote</strong>：两个对都下降 ≥ 25%，<strong>并且</strong> A 随 L1 预算变短单调下降 → 开始训练 EAGLE-3 head，进入完整网格。</li><li><strong>两个对都在 10–25%</strong>：先用 7B 的 DLER 对和 LC-R1 对做离线复核（约 2 GPU-h），再按"实测的中等每 token 税"继续 SD 一侧的主张。</li><li><strong>只有不匹配口径下降显著</strong>：转入"删段组合效应"分支。</li><li><strong>只有一个对达标</strong>：先做 7B 离线复核，再决定。</li></ul></li><li><p><strong>G0-Evict</strong>：R1-1.5B vs DLER-1.5B，MATH500 × 2 样本，4× 相对预算，逐头随机 / shared-draw / R-KV。</p>
+<ul><li><strong>Promote</strong>：子模型上 E 或准确率的相对父模型差距 ≥ 3 分（CI 不含 0）；<strong>或者</strong>子模型上 R-KV − 随机 ≥ +3 分，同时父模型上 ≤ +1 分。</li><li><strong>Kill</strong>：子模型上两个差距都 &lt; 1.5 分，<strong>并且</strong> O_K(c) / O_K(v) ∈ [0.9, 1.1]。</li></ul></li></ul>
+<h2 id="computea100-80gb">Compute（A100-80GB）</h2>
+<table><thead><tr><th>项目</th><th>GPU-h</th></tr></thead><tbody><tr><td>M0：RA harness 移植后复现 RA 的 Qwen3-4B MATH500 结果；walk-τ 与 vLLM 实测接受率对照</td><td>~4</td></tr><tr><td>trace 生成（11 个模型）</td><td>~10</td></tr><tr><td>重采样对照（只做 MATH500）</td><td>~5</td></tr><tr><td>离线 τ / G / drafter / EAGLE 前向</td><td>~5</td></tr><tr><td>代价网格 + 端到端验证（b = 1 / 32 / 128）</td><td>~18</td></tr><tr><td>驱逐主网格（8 个模型 × 3 臂；MATH500 × 2，2/4/8×，父模型加 16×；AIME × 4，4×）</td><td>~117</td></tr><tr><td>full-KV 等价性检验（100 题 × 4 样本）</td><td>~15</td></tr><tr><td>L1 剂量扫描</td><td>~10</td></tr><tr><td>EAGLE-3 head 训练（7B 父模型，SpecForge，G0 promote 后才做）</td><td>~105</td></tr><tr><td><strong>合计</strong></td><td><strong>~289；加 15% 余量 ≈ 332（≤ 336）</strong></td></tr><tr><td>不含 EAGLE</td><td>~184；加 30% 余量 ≈ 240</td></tr></tbody></table>
+<ul><li><strong>工程量</strong>：约 2–3 人周。</li><li><strong>日历时间</strong>：8 卡下，第 1 周出 G0，第 4–5 周出主结果。</li></ul>
+<h2 id="named-risks">Named Risks</h2>
+<ol><li><strong>效应量</strong>：10–25% 是最可能的区间，存在被评价为"只是测量"的风险。G0 的中间分支专门处理这种情况。</li><li><strong>熵锐化</strong>：可能抬高 G，掩盖复述的损失。</li><li><strong>EAGLE-3 只有父模型 head</strong>：如果 G0 没有 promote、没训练 head，部署结论写作"仅对 n-gram / draft-model 类 SD 成立"。</li><li><strong>模型年代</strong>：R1-Distill 时代的 checkpoint 可能被 2026 年的审稿人认为过时。Qwen3 系列没有公开的压缩子模型，只能如实说明。</li><li><strong>vLLM draft-model 的词表行数不一致</strong>：离线 τ 不受影响。</li><li><strong>RA harness 的 Qwen2 移植</strong>（QKV bias）；shared-draw 是否跨层共享需确认。</li><li><strong>E 的置信区间宽</strong>（可能 ±10–20%）。</li><li><strong>O_K–τ 的联系弱于 O_K–驱逐</strong>（构造使然）。</li><li><strong>抢先风险</strong>：Random Attention 作者的后续工作。</li><li><strong>只覆盖数值类事实</strong>：GPQA 只放附录。</li></ol>
+
+<footer class="aris-footer">
+  Generated by <a href="https://github.com/wanshuiyin/Auto-claude-code-research-in-sleep/blob/main/skills/render-html/SKILL.md">ARIS <code>/render-html</code></a> ·
+  source path <code>refine-logs/FINAL_PROPOSAL.md</code> ·
+  SHA256 <code>2214e68b7a2a</code> ·
+  generated at 2026-10-17 16:02 UTC.
+  This is a generated view — edit the source Markdown, then re-render.
+</footer>
+</main>
+
+</div>
+
+<!-- P0 polish: paper popover host (populated by IIFE below) -->
+<div id="cite-pop" hidden role="dialog" aria-labelledby="cite-pop-title">
+  <button class="cp-close" type="button" aria-label="Close">×</button>
+  <div class="cp-content"></div>
+</div>
+
+<!-- P0 polish: figure lightbox (native <dialog>, graceful fallback) -->
+<dialog class="lightbox" id="figure-lightbox" aria-label="Figure detail">
+  <div class="lb-inner">
+    <button class="lb-close" type="button" aria-label="Close">×</button>
+    <img alt="" />
+    <figcaption></figcaption>
+  </div>
+</dialog>
+
+<!-- P0 polish: paper registry sidecar, embedded by render_html.py (--papers) -->
+<script>window.PAPER_REGISTRY = {};</script>
+
+<!-- P0 polish: interactive enhancements (TOC scrollspy, code-card auto-collapse,
+     paper popovers, figure lightbox, print-restore for <details>, blog-mode H2). -->
+<script>
+(function () {
+  "use strict";
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, function (c) {
+      return ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"})[c];
+    });
+  }
+
+  // --- Feature 5: Print degradation fix ---------------------------------
+  // Force every <details> open during print, restore the pre-print state after.
+  var _stashOpen = [];
+  var _printing = false;
+  window.addEventListener("beforeprint", function () {
+    if (_printing) return;  // guard against multi-fire (Chrome print preview)
+    _printing = true;
+    _stashOpen = [];
+    document.querySelectorAll("details:not([open])").forEach(function (d) {
+      _stashOpen.push(d);
+      d.open = true;
+    });
+  });
+  window.addEventListener("afterprint", function () {
+    _stashOpen.forEach(function (d) { if (d.isConnected) d.open = false; });
+    _stashOpen = [];
+    _printing = false;
+  });
+
+  // --- Feature 3: TOC scrollspy -----------------------------------------
+  var tocLinks = [].slice.call(document.querySelectorAll("nav.toc a"));
+  var headings = tocLinks.map(function (a) {
+    var id = a.getAttribute("href").replace(/^#/, "");
+    return document.getElementById(id);
+  }).filter(Boolean);
+  if (headings.length && typeof IntersectionObserver !== "undefined") {
+    var linkById = new Map();
+    headings.forEach(function (h, i) { linkById.set(h.id, tocLinks[i]); });
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (en) {
+        if (!en.isIntersecting) return;
+        tocLinks.forEach(function (l) { l.classList.remove("active"); });
+        var lk = linkById.get(en.target.id);
+        if (lk) lk.classList.add("active");
+      });
+    }, { rootMargin: "-15% 0px -75% 0px" });
+    headings.forEach(function (h) { io.observe(h); });
+  }
+
+  // --- Feature 1: Long-code auto-collapse -------------------------------
+  var COLLAPSE_THRESHOLD = 30;
+
+  function wrapCodeCard(pre, openByDefault) {
+    if (!pre || pre.closest("details.code-card")) return;
+    var code = pre.querySelector("code");
+    if (!code) return;
+    var lines = code.textContent.replace(/\n+$/, "").split("\n").length;
+    var det = document.createElement("details");
+    det.className = "code-card";
+    det.open = openByDefault;
+    var sum = document.createElement("summary");
+    function updateSummary() {
+      sum.textContent = (det.open ? "▾ Collapse code · " : "▸ Expand code · ") + lines + " lines";
+    }
+    updateSummary();
+    det.addEventListener("toggle", updateSummary);
+    pre.parentNode.insertBefore(det, pre);
+    det.appendChild(sum);
+    det.appendChild(pre);
+  }
+
+  // Honor explicit per-block flags first.
+  document.querySelectorAll("pre[data-collapse]").forEach(function (pre) {
+    var flag = pre.getAttribute("data-collapse");
+    if (flag === "collapsed") wrapCodeCard(pre, false);
+    // "open" → leave fully expanded, do not wrap.
+  });
+  // Then auto-wrap long unflagged blocks.
+  document.querySelectorAll("pre > code").forEach(function (code) {
+    var pre = code.closest("pre");
+    if (!pre || pre.closest("details") || pre.hasAttribute("data-collapse")) return;
+    var lines = code.textContent.replace(/\n+$/, "").split("\n").length;
+    if (lines >= COLLAPSE_THRESHOLD) wrapCodeCard(pre, false);
+  });
+
+  // --- Feature 10: Figure lightbox --------------------------------------
+  var lightbox = document.getElementById("figure-lightbox");
+  if (lightbox) {
+    var lbImg = lightbox.querySelector("img");
+    var lbCap = lightbox.querySelector("figcaption");
+    var lbClose = lightbox.querySelector(".lb-close");
+    function openLightbox(srcImg) {
+      lbImg.src = srcImg.src;
+      lbImg.alt = srcImg.alt || "";
+      var cap = srcImg.closest("figure") ? srcImg.closest("figure").querySelector("figcaption") : null;
+      lbCap.textContent = cap ? cap.textContent : "";
+      lbCap.hidden = !cap;
+      if (typeof lightbox.showModal === "function") lightbox.showModal();
+      else lightbox.hidden = false;
+    }
+    function closeLightbox() {
+      if (typeof lightbox.close === "function") lightbox.close();
+      else lightbox.hidden = true;
+    }
+    document.querySelectorAll("main figure img, main > p > img").forEach(function (img) {
+      if (img.closest("dialog")) return;
+      img.style.cursor = "zoom-in";
+      img.addEventListener("click", function () { openLightbox(img); });
+    });
+    if (lbClose) lbClose.addEventListener("click", closeLightbox);
+    lightbox.addEventListener("click", function (e) {
+      // Backdrop click closes; clicks inside .lb-inner do not bubble here.
+      if (e.target === lightbox) closeLightbox();
+    });
+  }
+
+  // --- Feature 2: Paper popover -----------------------------------------
+  var PAPERS = window.PAPER_REGISTRY || {};
+  var pop = document.getElementById("cite-pop");
+  var popContent = pop ? pop.querySelector(".cp-content") : null;
+  var popClose = pop ? pop.querySelector(".cp-close") : null;
+  var popTrigger = null;
+
+  function showPopover(el) {
+    var key = el.dataset.ref;
+    var info = PAPERS[key];
+    if (!info || !pop || !popContent) return;
+    popContent.innerHTML =
+      '<div class="cp-title" id="cite-pop-title">' + escapeHtml(info.title || key) + '</div>' +
+      (info.authors
+        ? '<div class="cp-meta">' + escapeHtml(info.authors) +
+            (info.date ? ' · ' + escapeHtml(info.date) : '') +
+            (info.inst ? ' · ' + escapeHtml(info.inst) : '') + '</div>'
+        : '') +
+      (info.key ? '<div class="cp-key">' + escapeHtml(info.key) + '</div>' : '') +
+      (info.arxiv
+        ? '<a class="cp-link" href="https://arxiv.org/abs/' + encodeURIComponent(info.arxiv) +
+          '" target="_blank" rel="noopener">arXiv ' + escapeHtml(info.arxiv) + ' ↗</a>'
+        : '');
+    var r = el.getBoundingClientRect();
+    pop.hidden = false;  // unhide first so offsetHeight is measurable
+    var margin = 16;
+    var popWidth = Math.min(360, Math.max(0, window.innerWidth - margin * 2));
+    var popHeight = Math.min(pop.offsetHeight || 200, Math.max(0, window.innerHeight - margin * 2));
+    pop.style.left = Math.max(margin, Math.min(r.left, window.innerWidth - popWidth - margin)) + "px";
+    pop.style.top = Math.max(margin, Math.min(r.bottom + 8, window.innerHeight - popHeight - margin)) + "px";
+    popTrigger = el;
+    if (popClose) popClose.focus();
+  }
+  function hidePopover() {
+    if (pop) pop.hidden = true;
+    if (popTrigger) popTrigger.focus();
+    popTrigger = null;
+  }
+  document.querySelectorAll("[data-ref]").forEach(function (el) {
+    el.setAttribute("tabindex", "0");
+    el.setAttribute("role", "button");
+    el.addEventListener("click", function (e) { e.stopPropagation(); showPopover(el); });
+    el.addEventListener("keydown", function (e) {
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); showPopover(el); }
+    });
+  });
+  if (popClose) popClose.addEventListener("click", hidePopover);
+  document.addEventListener("click", function (e) {
+    if (pop && !pop.hidden && !pop.contains(e.target) && !e.target.matches("[data-ref]")) hidePopover();
+  });
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape" && pop && !pop.hidden) hidePopover();
+  });
+
+  // --- Feature 7: Blog-mode active-H2 highlight (opt-in) ----------------
+  if (document.body.classList.contains("aris-blog")) {
+    var h2s = [].slice.call(document.querySelectorAll("main h2"));
+    if (h2s.length && typeof IntersectionObserver !== "undefined") {
+      var io2 = new IntersectionObserver(function (entries) {
+        entries.forEach(function (en) {
+          if (en.isIntersecting) {
+            h2s.forEach(function (h) { h.classList.remove("aris-active-h2"); });
+            en.target.classList.add("aris-active-h2");
+          }
+        });
+      }, { rootMargin: "-15% 0px -75% 0px" });
+      h2s.forEach(function (h) { io2.observe(h); });
+    }
+  }
+})();
+</script>
+</body>
+</html>

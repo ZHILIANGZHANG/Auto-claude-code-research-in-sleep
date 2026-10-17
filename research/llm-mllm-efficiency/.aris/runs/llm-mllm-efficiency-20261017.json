@@ -6,16 +6,15 @@
     "provisional_advances": false
   },
   "created": "2026-10-17T14:37:05Z",
-  "updated": "2026-10-17T15:31:48Z",
+  "updated": "2026-10-17T16:02:54Z",
   "gates": {
     "idea-discovery-evidence": {
       "verdict": "BLOCKED",
       "reasons": [
         "novelty-check review evidence missing (status=done)",
-        "research-review review evidence missing (status=done)",
-        "research-refine-pipeline evidence missing (status=skipped)"
+        "research-review review evidence missing (status=done)"
       ],
-      "updated": "2026-10-17T15:19:27Z"
+      "updated": "2026-10-17T16:02:54Z"
     }
   },
   "phases": [
@@ -73,8 +72,8 @@
     },
     {
       "phase": "research-refine-pipeline",
-      "status": "running",
-      "artifact": null,
+      "status": "done",
+      "artifact": "refine-logs/FINAL_PROPOSAL.md",
       "verdict_id": null,
       "reviewer": null,
       "reviewer_family": null,
@@ -82,7 +81,7 @@
       "acceptance_status": null,
       "executor_model": "claude-opus-5-5",
       "executor_family": "anthropic",
-      "updated": "2026-10-17T15:31:48Z"
+      "updated": "2026-10-17T16:02:54Z"
     }
   ]
 }

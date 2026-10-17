@@ -551,7 +551,16 @@ Also seen: s1 2501.19393, TALE 2412.18547, Chain of Draft 2502.18600, LC-R1 2506
 ### 其余候选：C7+C8（随机基线诊断）、C12（多轮视觉 KV）
 
 ## Refined Proposal
-- `/research-refine-pipeline` **本次没有运行**：用户只要求文献调研和选题，而且没有 GPU、没有跨模型评审，`FINAL_PROPOSAL.md` 不存在。下一步可以对 C1+C5 运行 `/research-refine-pipeline`，生成 `refine-logs/FINAL_PROPOSAL.md` 和 `EXPERIMENT_PLAN.md`。
+已对 C1+C5 运行 `/research-refine-pipeline`（2026-10-17）。评审 3 轮：6.4 → 7.1 → 7.8（REVISE，已收敛；评审为同家族 Claude 子代理）。
+- 方案：[`refine-logs/FINAL_PROPOSAL.md`](../refine-logs/FINAL_PROPOSAL.md)
+- 实验计划：[`refine-logs/EXPERIMENT_PLAN.md`](../refine-logs/EXPERIMENT_PLAN.md)；tracker：[`refine-logs/EXPERIMENT_TRACKER.md`](../refine-logs/EXPERIMENT_TRACKER.md)
+- 总览：[`refine-logs/PIPELINE_SUMMARY.md`](../refine-logs/PIPELINE_SUMMARY.md)
+- 关键修正：
+  - 主指标改为更新步进的 tokens/step（原先的逐位置平均偏向冗长模型）；
+  - 复述统计量 O_K 改为提及的联合存活（原先的逐头并集公式被 RA Table 3 证伪）；
+  - 统一使用两个交互因子 S_c/S_v、E_c/E_v；
+  - G0 改以 A = τ − 1 判定，并加入预注册的中间分支。
+- 预算：约 289 GPU-h（含 EAGLE-3 父模型 head），加余量约 332；G0 约 6 GPU-h。
 
 ## Next Steps
 - [x] 人工复核关键论文的全文：Random Attention 2609.03430（✅ 确认没有测过简洁模型）、DSTP 2604.12358（⚠️ 附录 G 有 Thinking 结果，见 [Full-text Verification](#full-text-verification)）
@@ -570,5 +579,4 @@ Also seen: s1 2501.19393, TALE 2412.18547, Chain of Draft 2502.18600, LC-R1 2506
 The workflow is not complete. Required stage evidence is missing:
 - BLOCKED: novelty-check review evidence missing (status=done)
 - BLOCKED: research-review review evidence missing (status=done)
-- BLOCKED: research-refine-pipeline evidence missing (status=skipped)
 <!-- ARIS_IDEA_DISCOVERY_EVIDENCE_GATE:END -->
