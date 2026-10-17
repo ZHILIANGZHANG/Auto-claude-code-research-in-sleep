@@ -349,3 +349,34 @@ Also seen: s1 2501.19393, TALE 2412.18547, Chain of Draft 2502.18600, LC-R1 2506
 | C10 drafter surprisal 驱逐 | 最可能的结果是"打平随机"，而 Random Attention 2609.03430 已有此结论 |
 | C5 | 并入 C1，不再单独成文 |
 | C7、C8、C12 | 没有淘汰，保留为候选（C7 + C8 可合并成诊断论文） |
+
+---
+
+<a id="novelty-verification"></a>
+## Novelty Verification
+
+三个子代理分别对前 3 名 idea 做深度新颖性检查，每个 39–50 次 WebSearch（以 extended 为主，重点覆盖 2026 年 5–10 月），判定遵循 ARIS 的 NOVELTY VERDICT LIMITS。**限制**：WebFetch 无法访问 arxiv.org（DNS 失败），判断全部基于检索摘要和摘录，没有读全文。评审者与执行者同属 Claude 家族（不是跨模型评审）。
+
+| Idea | 新颖性得分 | 判定 | 最近的已有工作 | 同期竞争（近 6 个月） |
+|---|---|---|---|---|
+| C1+C5 压缩吃掉冗余 | **7/10** | **PROCEED** | Random Attention 2609.03430；R-KV 2505.24133；ReCo 2608.04771；Scaling Up Speeding Up 2509.04474；SD Performance-or-Illusion 2601.11580 | Random Attention 的作者可能跟进；AvoKV-E 2610.03007；Spend Bytes on Breadth 2610.05685 |
+| C4 混合架构 softmax 层 KV 驱逐 | **6/10** | **PROCEED** | GateSight 2610.14754；HeadWiseKV 2609.02029；Protection Is (Nearly) All You Need 2605.18053；DeltaS 2609.27470；Some Attention is All You Need for Retrieval 2510.19861 | **竞争激烈**：2026 年 9–10 月已有 3 篇混合架构驱逐的方法论文 |
+| C2 Thinking MLLM 剪枝更脆弱 | **6/10** | **PROCEED** | DSTP 2604.12358；VisionPulse 2605.31457；ViMoD 2610.12060；TVC 2503.13360；On Test-Time Scaling for VLMs 2606.28864 | ViMoD（10 月 8 日，只用了 Instruct-4B）；AVIS 2606.11576；L2T 2610.15810 |
+
+### C1+C5（7/10，PROCEED）
+- **核心空白**：约 39 次检索中，没有任何论文在 ThinkPrune / L1 / AdaptThink / LC-R1 上测过投机解码接受率或随机驱逐的鲁棒性。也没有论文用"trace 冗余度"把 SD 和 KV 驱逐联系起来。
+- **新的具名风险**：
+  1. **位置混杂**：EAGLE 类方法的 τ 会随输出位置下降（Test-Time Speculation 2605.09329、SpecExtend 2505.20776）。压缩后的 trace 更短，可能反而显示更高的 EAGLE-3 τ，从而掩盖甚至反转效应。**必须在相同解码位置上比较，并以 n-gram / suffix τ（没有训练长度偏差）为主指标。**
+  2. **"填充 token 是低熵的"可能不成立**：overthinking 相关工作发现 "wait / but" 这类犹豫 token 是高熵的；DLER 2510.15110 发现部分长度惩罚方法削减的是高熵尾部。机制需要实测，不能预设。
+  3. 可能被评价为"只是测量 / 结果显然"。要立住，需要效应量足够大、重蒸馏 drafter 之后效应仍然存在，并且冗余度回归在 ≥3 个模型对、2 个尺度上都成立。
+- **定位**：在同一父模型的冗长→压缩推理模型对上证明：长度惩罚 RL 在相同解码位置上降低了 model-free 和 EAGLE-3 的接受长度（重蒸馏 drafter 后仍然如此），并且随机与打分 KV 驱逐之间的差距按 n-gram 复述率的损失成比例扩大。因此在投机解码下，token 数压缩高估了 wall-clock 节省，随机驱逐也不再免费。
+
+### C4（6/10，PROCEED，竞争激烈）
+- **核心空白**：没有论文做 size-matched / 蒸馏自父模型的混合 vs 稠密受控对照，也没有用逐层 recency mass / 熵来解释失败。已有工作要么是单模型族的方法论文（GateSight、HeadWiseKV、DeltaS），要么只附带测了一个混合模型（2605.18053）。
+- **与假设相反的证据**：2605.18053 发现混合模型在相同策略集下反而**更不脆弱**；HeadWiseKV 用按头的窗口在混合模型的全局层上接近 full-KV；Hymba 发现有 SSM 头时局部注意力就够用。→ **"窗口驱逐会断崖式失效"这一假设风险很高**，必须写成结论不预设方向的"图谱"，覆盖 64–128K 以及 multi-key / variable-tracking 任务，并把 GateSight / HeadWiseKV 列为基线。
+- 未能确认存在的 triage 邻居："When Perplexity Lies" 2603.26556 没有出现在任何检索结果里；HySparse 2602.03560 只有二手摘要。两者都不引用。
+
+### C2（6/10，PROCEED）
+- **核心空白**：没有匹配的 Instruct vs Thinking 剪枝对照（3 个尺寸 + 只统计两边都答对的题），也没有在同一 checkpoint 内扫思考预算。DSTP、VisionPulse、ViMoD 都只是借"解码期偏移"来引出各自的方法。
+- **必须先人工核对**：DSTP 的结果表里**可能已经同时有 Qwen3-VL-4B 的 Instruct 和 Thinking 两行**（只有一条摘录提到，未核实）。如果有，claim 1 降级为"在 3 个尺寸上加 both-correct 控制的确认性结果"，改以 claim 2–3（晚期证据的因果测量 + 思考预算曲线）为主线。
+- **反向证据**（让问题不那么显然，但会提高立论门槛）：On Test-Time Scaling for VLMs（图像的贡献在早期之后急剧下降）、TVC（后半段去掉图像只掉约 2 分）、VisualSwap（Thinking 模型的"重看"往往没有真正去看图）。→ 晚期证据必须用**因果消融**来证明，不能只看注意力。
