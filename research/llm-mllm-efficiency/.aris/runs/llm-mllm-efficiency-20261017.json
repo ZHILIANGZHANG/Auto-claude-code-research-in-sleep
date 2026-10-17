@@ -6,7 +6,7 @@
     "provisional_advances": false
   },
   "created": "2026-10-17T14:37:05Z",
-  "updated": "2026-10-17T15:19:27Z",
+  "updated": "2026-10-17T15:31:48Z",
   "gates": {
     "idea-discovery-evidence": {
       "verdict": "BLOCKED",
@@ -73,7 +73,7 @@
     },
     {
       "phase": "research-refine-pipeline",
-      "status": "skipped",
+      "status": "running",
       "artifact": null,
       "verdict_id": null,
       "reviewer": null,
@@ -82,7 +82,7 @@
       "acceptance_status": null,
       "executor_model": "claude-opus-5-5",
       "executor_family": "anthropic",
-      "updated": "2026-10-17T15:07:13Z"
+      "updated": "2026-10-17T15:31:48Z"
     }
   ]
 }
