@@ -6,7 +6,59 @@
 
 - 共执行 36 次 WebSearch（中途触发会话搜索上限），查询覆盖 KV cache 驱逐/合并/量化、视觉 token 剪枝（图像/高分辨率/视频/流式）、投机/并行解码（含 dLLM）、PTQ/旋转量化/MLLM 量化、稀疏注意力/prefill、层跳过/早退/MoE 专家剪枝与卸载、reasoning 模型 over-thinking、多轮/agent/端侧场景、评测与诊断类论文。
 - 本环境 arxiv.org / huggingface / openreview / alphaxiv 全部被 egress proxy 拒绝（CONNECT 403），WebFetch 亦 DNS 失败，因此**无法读取 abs/HTML 全文**；每篇论文的「问题/方法/数字」来自搜索引擎返回的 abstract 摘录（多为 arXiv abs 或会议页面的一手摘要），「limitation」一栏只记录摘要/相关工作中作者自己承认或被他人指出的，未能读 limitation section 的标注为「未读」。
-- 所有 arXiv ID 都是搜索结果中直接出现的；2024 年以前的经典锚点（FastV、SparseVLM、VisionZip、PruneVid、H2O、SnapKV、PyramidKV、LayerSkip、Lookahead）在相关工作中被反复点名，ID 为本人确认过的公开 ID。
+- （2026-10-17 更新：主要条目已按 §0.5 用 arXiv abs/HTML 页面二次核实。）所有 arXiv ID 都是搜索结果中直接出现的；2024 年以前的经典锚点（FastV、SparseVLM、VisionZip、PruneVid、H2O、SnapKV、PyramidKV、LayerSkip、Lookahead）在相关工作中被反复点名，ID 为本人确认过的公开 ID。
+
+## 0.5 核实记录（2026-10-17，abs 页面）
+
+核实方式：`arxiv.org/abs/<ID>` 页面（标题/日期/评论行/摘要）+ 必要时 `arxiv.org/html/<ID>` 关键字 grep；非 arXiv 条目用 CrossRef。API（export.arxiv / S2 / OpenAlex）被限速未用。记号：✅ 一致 / ✏️ 修正 / ❌ 未找到 / ⚠ 仍无法核实。
+
+### 0.5.1 §0 点名与带「未确认/未读/二手/疑似」标记的条目
+- RetentiveKV：✏️ 修正：「ACL'26 Findings，无 ID，TF 未确认」→ arXiv **2605.04075**（2026-04-14），ACL 2026 Findings（DOI 10.18653/v1/2026.findings-acl.934）。标题一致；5.0× KV、1.5× 解码一致。**非严格 TF**：HTML 中状态检索门控 γ_t=σ(W_r·H_t+b_r) 含可学习参数（W_r、b_r）。
+- ViSkip（MMSpec 2603.14989）：✅ 已核实：HTML 描述为 plug-and-play 门控——视觉相关性分数 S_t>τ 时关闭草拟、由目标模型逐 token 生成；本身不含训练，但可叠加在训练式（ViSpec/MSD）或无训练（SAM Decoding）drafter 之上。Lookahead 在 Qwen2.5-VL-7B 平均 1.07×、部分子任务 0.77× 一致。
+- LU-KV 2602.08585：✅ ID-标题一致（"Predicting Future Utility: Global Combinatorial Optimization for Task-Agnostic KV Cache Eviction"，2026-02-09，v2 2026-06-01）。摘要明确「data-driven offline profiling protocol」→ 无训练但需离线 profiling，不是严格 TF；LongBench/RULER 上 KV -80%。
+- MixedDimKV 2603.20616：✅ ID-标题一致（"Beyond Token Eviction: Mixed-Dimension Budget Allocation…"，2026-03-21）。✏️ 修正：基础版 MixedDimKV **不需要**头级 profiling（摘要：优于「不依赖头级重要性 profiling」的方法）；只有 -H 版用头重要性并对比 HeadKV。6.25% cache≈full attention、NIAH 50K 下 0.26% cache 100% 一致。
+- KVzip 2505.23416：✅ 已读摘要：NeurIPS 2025 Oral；3–4× KV、FlashAttention 解码延迟≈2×、query-aware 方法在 90% 预算即退化（多 query 场景）一致。HTML 未提及任何视觉/多模态实验（纯文本）。
+- Expected Attention 2510.00636：✅ 已核实 HTML：Llama3.1-8B、序列至 120k，50%/90% 压缩比下「up to 15GB less memory」；TF、KVPress 20+ 方法一致。
+- UltraQuant 2606.20474：✏️ 修正：TF「未确认」→ **是**（TurboQuant 式旋转+码本的 PTQ 型 4-bit KV，无训练）；EMNLP 2026 Industry Track（v3 2026-09-11）；在 Claude Code 生产轨迹回放上 2.71×（MiniMax-M2.5）/4.38×（Qwen3-235B）合格请求吞吐；AMD CDNA4 FP4 kernel。
+- InfiniPot-V 2506.15745：✅ NeurIPS 2025；TF、query-agnostic、硬内存上限、峰值显存 -94%、多轮对话保持精度一致；摘要称面向端侧但未说明实验硬件（仍标「实验设备未核」）。
+
+### 0.5.2 10 个候选 idea 的 Closest work
+- 2503.24000（Rethinking KV Cache Compression for LLM Serving）：✅ MLSys 2025，2025-03-31；摘要「compressing KV cache may lead to longer outputs → 端到端延迟升高」；HTML Table 4/5：LLaMA/Mistral-7B 上三种压缩法输出更「verbose」，只统计未解释机制。→ Idea 1 的现象来源成立，摘要未包含归因或修复。
+- ThinKV 2510.01290：✅ ID-标题一致；✏️ 补充：**ICLR 2026 Oral**（v2 2026-05-07）；<5% KV 近无损、吞吐 ≤5.8×。HTML Fig.10(d)：**纯量化**可使 R1-Llama-8B 生成长度膨胀 ≤5.1×，而**驱逐类（R-KV）不引起长度膨胀**；ThinKV 的 TBQ 单独使用时因「inflated generation length」平均精度更低。→ 与 2503.24000「驱逐也会变长」部分矛盾，Idea 1 的假设需按「量化 vs 驱逐」分开检验。摘要未含归因/锚点保护。
+- BeaconKV 2609.04971：✅ ICML 2026，2026-09-04，TF；5.8× 内存、>4.3× 吞吐；HTML：Qwen3-14B AIME24 预算 1024 下 +31.7pt 一致。摘要含 Thought Revisiting Tokens、beacon query；不涉及长度。
+- R-KV 2505.24133：✅ v4 2026-01；10% KV 保 ~100%、6.6× 吞吐；CrossRef 显示 NeurIPS 2025。「R1-8B 32K tokens → 4.1GB KV」出自 R-KV HTML 引言（R1-Distill-Llama-8B）一致。
+- RPC 2505.13866：✅ TF，QwQ-32B 吞吐 ≤1.60×、精度降 ~1.2 一致。
+- KVzip / FlashCache 2511.16786 / RetentiveKV 2605.04075（Idea 2）：✅ FlashCache CVPR 2026，1.69× 解码、-80% KV 一致；HTML 无「多 query / prefix 复用」评测。KVzip 纯文本。RetentiveKV 为熵+状态空间重激活、非重建式打分。→ **三者摘要均未包含「用模型重建图像/视频描述作为 query-agnostic 视觉 KV 打分 + 多问复用」**。
+- 2512.07580（When Token Pruning is Worse than Random）：✅ CVPR 2026（v2 2026-03-09）；✏️ 修正数字说明：DivPrune+随机 50% 剪枝保 Qwen2.5-VL-7B **96.9%** 出自 v2 摘要；DART+随机 **93.9%** 出自 v2 Tab.1（7 benchmark 平均，OCRBench 75.5→77.9）；二者并非 v1/CVPR 版之别。**摘要已包含 Idea 3 的核心做法**：(a) 定义「信息地平线」并指出其随任务（OCR 更深）与模型能力（Qwen2.5-VL 比 LLaVA-1.5 更深）移动；(b) 「simple random pruning in deep layers」；(c) 「integrating random pruning consistently enhances existing methods」（浅层用 DART/DivPrune/FastV、深层随机），HTML 明确说明深层随机可与 FlashAttention 兼容、无额外计算。Idea 3 剩余增量仅为：无标签自动估计地平线层、去偏注意力、视频/高分辨率外推。
+- 2502.11501：✅ ACL 2025 Findings（v2 2025-05-29）；纯诊断，提出随机/均匀基线问题，未给自适应方法。
+- HoloV 2510.02912：✅ NeurIPS 2025 main；LLaVA-1.5 剪 88.9% 保 95.8% 一致；TF（plug-and-play）。
+- 2508.17807（Attention Debiasing）：✅ 2025-08，v2 2026-01；TF、plug-and-play。
+- QAPruner 2604.02816：✅ 2026-04-03；12.5% 保留 +2.24%、超过未剪枝稠密量化、「首个联合优化」一致；HTML 未涉及 KV 驱逐。
+- 2604.17320：✏️ 修正标题：实为 "Towards Joint Quantization and Token Pruning of Vision-Language Models"（QUOTA 框架，2026-04-19）；HTML 确认校准用 FlatQuant 并扩到视觉塔+投影器 W4A4+量化 KV；30% token 保 95.65%。无 KV 驱逐。
+- RDKV 2605.08317：✅ 2026-05-08；LongBench 2.48% cache 保 97.81%、128K 下 4.5× 解码；权重 FP16。HqeKV：✅ CrossRef 确认 ACL 2026 Findings（10.18653/v1/2026.findings-acl.201），无 arXiv ID。
+- SparseSpec-L 2607.27735：✅ 2026-07-30，投稿 AAAI 2027；TF；HTML：≤2.79×（Llama-3.1-8B LongBench v2）、3B–14B 1.55–2.79×；猜测过长反而变慢的分析一致。HTML 无任何 vision/VLM 内容。
+- MMSpec 2603.14989：✅ 2026-03-16；600 样本/6 类/10 方法、三条发现一致；HTML 无「剪枝」内容。
+- LayerSkip 2404.16710：✅ ACL 2024，需训练（layer dropout + early-exit loss），自投机 ≤2.16×。
+- Pitfalls 2510.00231：✅ ACL 2026 **main**（long.1926），v2 2026-05-13；五方法、Llama3.1-8B/Qwen2.5-14B、IFEval、系统提示泄露一致；无 agent/工具调用内容（无 HTML 版）。
+- ST-Lite 2603.00188：✅ EMNLP 2026 Findings（v3 2026-08-26）；TF；20% 预算下现有方法仅保留 39% oracle 重要 KV；≤2.35× 解码。
+- Sparse Frontier 2504.17768：✅ v3 2026-06-22；6 方法/128K/0.95/9 任务、「longer sequences tolerate higher sparsity → fixed-budget suboptimal」一致；评论行无会议信息（ACL'26 Findings 未能核实）。
+- Physics 2603.01426：✅ 2026-03-02；~90% 幻觉悬崖、GER 尖峰、LLaMA/Qwen 动力学差异一致；HTML 无在线控制器。
+- LAVa 2509.09754：✅ 2025-09-11；无训练、动态层/头预算、层预算利于生成任务/头预算利于抽取任务一致；评论行无会议信息。
+- **Compactor 2507.08143（Idea 7 风险）**：✅ TF、query-agnostic；但摘要已含「**context-calibrated compression：推断给定上下文在显著性能损失前可承受的最大压缩率**」，LongBench 上据此平均省 68% 且无损（HTML §3.5/§5.4：按 NLL 增幅 ≈5% 拟合校准方程，每方法分别标定）。→ 与 Idea 7「每请求自适应压缩率」核心重叠。
+- ACE 2609.05228：✅ 2026-09-04；TF、无校准、保留 top-1 专家一致；✏️ 修正：「50% 跳过最优」→ 在 50%–60% 高跳过率下优势最明显（Qwen3.6-35B-A3B 50% 时 PPL -7.96%、精度 +4.15pt）。HTML 无 KV cache/MLA 内容。
+- 2603.23701：✅ 2026-03-24；指标+基准、稠密>MoE/SSM、>20B 与 base 潜力更高一致。
+- DraftExpert 2607.24434：✏️ 修正 TF「是」→ **否**：每层用自蒸馏训练一个轻量 draft expert；1.45× 吞吐、接受率 84–87%；DeepSeek-V2-Lite/Moonlight-16B-A3B。
+- DEER 2504.15895：✅ v3 2025-09；无训练、10 基准 11 模型、-19.1%～-80.1%、+0.3～5.0 一致（ICLR'26 未见于评论行）。
+- DMS 2506.05345：✅ NeurIPS 2025；1K 步、Qwen-R1 32B AIME24 +12.0 一致。MadaKV 2506.15724：✅ 1.3–1.5×。GRKV 2605.31105：✅ ✏️ 补充 EMNLP 2026 Main。
+
+### 0.5.3 报告直接引用的 §1 论文（其余）
+2503.24000 ✅ / 2510.01290 ✅(+ICLR'26 Oral) / 2603.01426 ✅ / 2504.17768 ✅ / 2510.00231 ✅ / 2609.04971 ✅ / 2512.07580 ✅(数字出处修正) / 2502.11501 ✅ / 2603.14989 ✅ / 2607.27735 ✅ / 2604.02816 ✅ / 2505.23416 ✅ / 2510.00636 ✅ / 2605.31105 ✅ / 2506.15745 ✅ / 2511.16786 ✅ / 2603.23701 ✅。其他：River-LLM ✅ CrossRef 确认 ACL 2026 long.1746（数字未核）。
+
+### 0.5.4 仍无法核实
+- ⚠ WAVE (ICML'26)、FLoC (ICLR'26)、Perception Compressor、Confidence-Coverage Gating / Activation Steering (NeurIPS'25 WS)、HAWK、SepPrune、COMPEL/STUN：无 arXiv ID，本次未查。
+- ⚠ River-LLM 1.71–2.16×、WAVE ≤1.4× 的数字未核（注意 2.16× 与 LayerSkip 摘要数字相同，可能混淆）。
+- ⚠ Sparse Frontier / LAVa / DEER 的会议归属（arXiv 评论行未标）。
+- ⚠ InfiniPot-V 实验硬件、VQKV 2603.16435 等未抽查的表格条目未逐一核实（仅核实上列 ~37 篇）。
 
 ---
 
@@ -20,25 +72,25 @@ TF = training-free。日期为 arXiv 首发（或会议）。
 |---|---|---|---|---|---|---|---|
 | H2O / SnapKV / PyramidKV（锚点） | 2306.14048 / 2404.14469 / 2406.02069 | 2023–24 | prefill 后 KV 过大 | 累计注意力 / 观察窗注意力 / 逐层金字塔预算驱逐 | — | 是 | 后续论文反复指出：query-aware、依赖 attention score、与 FlashAttention 不兼容、长解码任务未评测 |
 | KIVI（锚点） | [2402.02750](https://arxiv.org/abs/2402.02750) ICML'24 | 2024-02 | KV 量化 | K 按 channel、V 按 token 的 2-bit 非对称量化 | 峰值显存降 2.6× | 是 | — |
-| KVzip | [2505.23416](https://arxiv.org/abs/2505.23416) NeurIPS'25 oral | 2025-05 | query-aware 驱逐在多 query / prefix 复用场景失效 | 用「模型能否从 cache 重建原文」做 query-agnostic 打分 | cache 3–4×↓，FlashAttention 解码延迟≈2×↓；query-aware 方法在 90% 预算下即退化 | 是（需一次重建前向） | 打分需额外 prefill 级前向；未读 |
+| KVzip | [2505.23416](https://arxiv.org/abs/2505.23416) NeurIPS'25 oral | 2025-05 | query-aware 驱逐在多 query / prefix 复用场景失效 | 用「模型能否从 cache 重建原文」做 query-agnostic 打分 | cache 3–4×↓，FlashAttention 解码延迟≈2×↓；query-aware 方法在 90% 预算下即退化 | 是（需一次重建前向） | 打分需额外 prefill 级前向；已核实（NeurIPS'25 Oral，纯文本实验） |
 | Inference-Time Hyper-Scaling (DMS) | [2506.05345](https://arxiv.org/abs/2506.05345) NeurIPS'25 | 2025-06 | 推理模型生成受 KV 读带宽限制 | 1K 步训练的延迟驱逐稀疏化，省下的内存换更多采样/更长推理 | Qwen-R1-32B 等读带宽下 AIME24 +12.0 | 否（1K 步） | 作者称优于 training-free 稀疏注意力 → 对 TF 路线的直接挑战 |
 | LAVa | [2509.09754](https://arxiv.org/abs/2509.09754) EMNLP'25 Findings | 2025-09 | 预算如何在层与头间分配 | 统一的跨头可比指标 + 动态层/头预算 | LongBench/NIAH/RULER/InfiniteBench | 是 | 发现：层预算对生成类任务关键、头预算对抽取类关键（任务依赖） |
-| Expected Attention | [2510.00636](https://arxiv.org/abs/2510.00636) | 2025-10 | 未来 query 的注意力不可得，FlashAttention 不暴露分数 | 假设激活分布，闭式估计未来 query 对每个 KV 的期望注意力；附 KVPress 库(20+方法) | prefill 与 decode 两阶段均优于基线；120k 上下文省 ~15GB（二手） | 是 | 依赖激活分布假设；KVPress 非部署引擎 |
+| Expected Attention | [2510.00636](https://arxiv.org/abs/2510.00636) | 2025-10 | 未来 query 的注意力不可得，FlashAttention 不暴露分数 | 假设激活分布，闭式估计未来 query 对每个 KV 的期望注意力；附 KVPress 库(20+方法) | prefill 与 decode 两阶段均优于基线；Llama3.1-8B 120k 上下文峰值显存省 ≤15GB（已核实 HTML） | 是 | 依赖激活分布假设；KVPress 非部署引擎 |
 | The Pitfalls of KV Cache Compression | [2510.00231](https://arxiv.org/abs/2510.00231) ACL'26 | 2025-09 | 多指令提示下压缩效果未评测 | 用 IFEval 评测 StreamingLLM/SnapKV/TOVA/H2O/K-Norm；系统提示泄露案例 | 某些指令被更快驱逐→被完全忽略；受方法、指令顺序、驱逐偏置影响 | — (诊断) | 只给出「简单修改驱逐策略」的初步修复 |
 | Rethinking KV Compression for Serving | [2503.24000](https://arxiv.org/abs/2503.24000) MLSys'25 | 2025-03 | 压缩的内存节省是否变成吞吐 | 系统级评测 | 压缩会**拉长输出**→端到端延迟反升；FlashAttention/PagedAttention 未对压缩优化 | — (诊断) | 未解释为什么变长 |
 | Physics of KV Compression | [2603.01426](https://arxiv.org/abs/2603.01426) | 2026-03 | 压缩为何/何时失效 | 把压缩视为注意力路由扰动；合成多实体/多跳任务 | 所有模型在 ~90% 压缩处出现幻觉悬崖，与 Global Eviction Ratio 尖峰同步；LLaMA 与 Qwen 头一致性动态不同 | — (诊断) | 合成任务；未给在线控制器 |
-| LU-KV | [2602.08585](https://arxiv.org/abs/2602.08585) | 2026-02 | 头级预算 | 头分「即时贡献」vs「长程效用」，凸包松弛+边际效用贪心，含离线 profiling | — | 需离线 profiling | 是否严格 TF 未确认 |
-| MixedDimKV | [2603.20616](https://arxiv.org/abs/2603.20616) | 2026-03 | 只驱逐整 token 太粗 | 按 token 分配保留维度，-H 版加头重要性 | 6.25% cache ≈ full attention (LongBench) | 需 profiling | 对比 HeadKV |
+| LU-KV | [2602.08585](https://arxiv.org/abs/2602.08585) | 2026-02 | 头级预算 | 头分「即时贡献」vs「长程效用」，凸包松弛+边际效用贪心，含离线 profiling | — | 无训练，需数据驱动离线 profiling（非严格 TF） | 已核实：LongBench/RULER 上 KV -80% |
+| MixedDimKV | [2603.20616](https://arxiv.org/abs/2603.20616) | 2026-03 | 只驱逐整 token 太粗 | 按 token 分配保留维度，-H 版加头重要性 | 6.25% cache ≈ full attention (LongBench)；NIAH 50K 下 0.26% cache 100% | 基础版是（无需头级 profiling）；-H 版需头重要性 | 已核实；-H 版对比 HeadKV |
 | VQKV | [2603.16435](https://arxiv.org/html/2603.16435v1) | 2026-03 | KV 量化 | 向量量化 KV | LLaMA-3.1-8B 压缩 82.8%，保 98.6% LongBench | 是 | 仅 8B，未测小模型/端侧 |
-| GRKV | [2605.31105](https://arxiv.org/abs/2605.31105) | 2026-05 | 先驱逐后合并造成注意力失衡 | 岭回归把被驱逐 token 信息分配到保留 token，直接最小化压缩后注意力输出差 | LongBench/RULER | 是 | — |
+| GRKV | [2605.31105](https://arxiv.org/abs/2605.31105) EMNLP'26 Main | 2026-05 | 先驱逐后合并造成注意力失衡 | 岭回归把被驱逐 token 信息分配到保留 token，直接最小化压缩后注意力输出差 | LongBench/RULER | 是 | — |
 | SelKV | [2607.16213](https://arxiv.org/abs/2607.16213) | 2026-07 | 合并 vs 丢弃按 token 决定 | 基于 V 相似度的软 cosine 门 + 解码期 logit 补偿 softmax 失衡 | 25% cache LongBench | 是 | — |
 | RDKV / MoE-nD / HqeKV / CAPKV | [2605.08317](https://arxiv.org/abs/2605.08317) / [2604.17695](https://arxiv.org/abs/2604.17695) / ACL'26 Findings / [2604.25975](https://arxiv.org/abs/2604.25975) | 2026 | 驱逐 × 量化联合 | 率失真比特分配 / 逐层路由驱逐率与位宽 / 逐元素选择压缩动作 / 容量感知驱逐+HQQ 4bit | — | 大多 TF | 2026 上半年**密集涌现**，说明「联合」已成红海 |
 | kvtc / Transform coding 视角 | [2511.01815](https://arxiv.org/abs/2511.01815) / [2608.14191](https://arxiv.org/abs/2608.14191) | 2025-11 / 2026-08 | 跨轮存储的 KV 压缩 | 变换编码；指出现有量化忽略误差经注意力传播 | kvtc 20× 压缩保持推理精度 | 是 | — |
 | Compactor | [2507.08143](https://arxiv.org/abs/2507.08143) | 2025-07 | query-aware 与 prefix caching 不兼容 | 近似 leverage score 的 query-agnostic 驱逐 | — | 是 | 指出「驱逐多少不伤质量」几乎无先前工作 |
 | Hold Onto That Thought | NeurIPS'25 WS; [2512.12008](https://arxiv.org/abs/2512.12008) | 2025-12 | 压缩方法多为 prefill 设计，长解码推理未评测 | 系统评测 | 没有单一策略通吃，强依赖数据集类型 | — | — |
-| R-KV / RPC / ThinKV / BeaconKV / Moment-KV | [2505.24133](https://arxiv.org/abs/2505.24133) / [2505.13866](https://arxiv.org/abs/2505.13866) / [2510.01290](https://arxiv.org/abs/2510.01290) / [2609.04971](https://arxiv.org/abs/2609.04971) ICML'26 / [2605.29873](https://arxiv.org/abs/2605.29873) | 2025-05 → 2026-09 | 推理模型解码期 KV 爆炸（R1-8B 32K tokens → 4.1GB KV） | 冗余反思去重 / 近期 query 窗口打分（QwQ-32B 1.6× 吞吐、AIME -1.2） / 思维感知量化+驱逐 / 「beacon query」预测会被重访的远距 KV（5.8× 内存、>4.3× 吞吐，Qwen3-14B AIME24 +31.7pt@1024 预算） / 动量式解码期压缩 | 是 | BeaconKV 指出：依赖近期 query 的方法在长推理中失效（存在 Thought Revisiting Tokens）；ThinKV 指出激进量化会**拉长生成**抵消节省 |
+| R-KV / RPC / ThinKV / BeaconKV / Moment-KV | [2505.24133](https://arxiv.org/abs/2505.24133) / [2505.13866](https://arxiv.org/abs/2505.13866) / [2510.01290](https://arxiv.org/abs/2510.01290) ICLR'26 Oral / [2609.04971](https://arxiv.org/abs/2609.04971) ICML'26 / [2605.29873](https://arxiv.org/abs/2605.29873) | 2025-05 → 2026-09 | 推理模型解码期 KV 爆炸（R1-8B 32K tokens → 4.1GB KV） | 冗余反思去重 / 近期 query 窗口打分（QwQ-32B 1.6× 吞吐、AIME -1.2） / 思维感知量化+驱逐 / 「beacon query」预测会被重访的远距 KV（5.8× 内存、>4.3× 吞吐，Qwen3-14B AIME24 +31.7pt@1024 预算） / 动量式解码期压缩 | 是 | BeaconKV 指出：依赖近期 query 的方法在长推理中失效（存在 Thought Revisiting Tokens）；ThinKV（HTML Fig.10d）指出**纯量化**可使生成长度膨胀 ≤5.1×、而驱逐类（R-KV）不引起膨胀；ThinKV <5% KV 近无损、吞吐 ≤5.8× |
 | ST-Lite | [2603.00188](https://arxiv.org/abs/2603.00188) | 2026-03 | 长程 GUI agent 截图+动作历史使 cache 暴涨 | 空间+轨迹感知打分 | — | 是 | 仅 GUI agent |
-| UltraQuant | [2606.20474](https://arxiv.org/abs/2606.20474) | 2026-06 | 上下文重的 agent：长前缀被多轮短 turn 复用 | 4-bit KV 量化研究 | — | 未确认 | — |
+| UltraQuant | [2606.20474](https://arxiv.org/abs/2606.20474) | 2026-06 | 上下文重的 agent：长前缀被多轮短 turn 复用 | TurboQuant 式旋转+码本 4-bit KV（PTQ 型），AMD FP4 kernel | Claude Code 轨迹回放：合格请求吞吐 2.71×（MiniMax-M2.5）/4.38×（Qwen3-235B） | 是（已核实，EMNLP'26 Industry） | 量化而非驱逐；无段感知策略 |
 | Don't Waste Bits / SparKV / Persistent Q4 KV | [2604.04722](https://arxiv.org/abs/2604.04722) / [2604.21231](https://arxiv.org/abs/2604.21231) / [2603.04428](https://arxiv.org/abs/2603.04428) | 2026 | 端侧 KV | 学习式逐 token 位宽控制器（**非 TF**）/ 开销感知 KV 加载 / llama.cpp Q4 持久 KV 用于多 agent | — | 混合 | 端侧小模型 (0.5–3B) 的 TF 压缩几乎无人系统评测 |
 
 ### 1.2 视觉 token 剪枝 / 合并（图像、高分辨率、视频）
@@ -46,21 +98,21 @@ TF = training-free。日期为 arXiv 首发（或会议）。
 | 论文 | ID / 会议 | 日期 | 问题 | 方法 | 数字 | TF | limitation / 备注 |
 |---|---|---|---|---|---|---|---|
 | FastV / SparseVLM / VisionZip / PruneVid（锚点） | 2403.06764 ECCV'24 / 2410.04417 ICML'25 / 2412.04467 CVPR'25 / 2412.16117 ACL'25 | 2024 | 视觉 token 冗余 | 层内注意力剪枝 / 文本引导稀疏化 / 编码器端主导 token + 上下文合并 / 视频时空合并 | — | 是 | 后续被指出：位置偏置、attention-sink、深层无效 |
-| Are We Solving the Right Problem? | [2502.11501](https://arxiv.org/abs/2502.11501) | 2025-02 | 剪枝设计是否真的有用 | 诊断 | 随机/池化的空间均匀选择常胜复杂设计；应报 latency 而非 FLOPs | — | — |
+| Are We Solving the Right Problem? | [2502.11501](https://arxiv.org/abs/2502.11501) ACL'25 Findings | 2025-02 | 剪枝设计是否真的有用 | 诊断 | 随机/池化的空间均匀选择常胜复杂设计；应报 latency 而非 FLOPs | — | — |
 | HoloV | [2510.02912](https://arxiv.org/abs/2510.02912) NeurIPS'25 | 2025-10 | attention-first 保留语义相似 token，高剪枝比崩溃 | 预算按空间 crop 分配 | LLaVA-1.5 剪 88.9% 保 95.8% | 是 | — |
 | Attention debiasing | [2508.17807](https://arxiv.org/abs/2508.17807) | 2025-08 | VLM 注意力偏向后位 token/图像下部/padding | 去除 recency bias 与 sink，得到位置无关重要性 | — | 是 | — |
 | D²Pruner | [2512.19443](https://arxiv.org/abs/2512.19443) AAAI'26 | 2025-12 | 重要性法的位置偏置 | 去偏重要性 + 结构多样性 | — | 是 | — |
-| When Token Pruning is Worse than Random | [2512.07580](https://arxiv.org/abs/2512.07580) CVPR'26 | 2025-12 | TF 剪枝是否优于随机 | 「vanishing token information」：用删 token 后输出概率变化度量 | ≥~20 层后现有方法不优于随机；DivPrune+随机 50% 剪枝保 Qwen2.5-VL-7B 96.9%（v1）/ DART+随机 93.9%（CVPR 版） | — | 对整个子方向的根本性质疑 |
+| When Token Pruning is Worse than Random | [2512.07580](https://arxiv.org/abs/2512.07580) CVPR'26 | 2025-12 | TF 剪枝是否优于随机 | 「vanishing token information」：用删 token 后输出概率变化度量 | ≥~20 层后现有方法不优于随机；DivPrune+随机 50% 剪枝保 Qwen2.5-VL-7B 96.9%（v2 摘要）/ DART+随机 93.9%（v2 Tab.1）；地平线随任务（OCR 更深）与模型能力移动；**已提出「浅层现有方法 + 深层随机」组合** | — | 对整个子方向的根本性质疑 |
 | VisionTrim | [2601.22674](https://arxiv.org/abs/2601.22674) ICLR'26 | 2026-01 | 统一图像+视频 | 全局-局部主导 token 选择 + 文本引导补全合并 | — | 是 | — |
 | ForestPrune | [2603.22911](https://arxiv.org/abs/2603.22911) | 2026-03 | 视频 MLLM 高比例剪枝 | 跨帧语义/空间/时间约束的 token forest | — | 是 | — |
 | Unified Spatiotemporal Token Compression | [2603.21957](https://arxiv.org/abs/2603.21957) | 2026-03 | 10% 保留下 32 帧仍剩数百 token | 单阶段时空联合压缩 | — | 是 | — |
 | FLoC | ICLR'26 (mlanthology cho2026iclr-floc) | 2026 | 长视频 | facility-location + lazy greedy，query-agnostic、模型无关 | Video-MME/MLVU/LongVideoBench/EgoSchema 均超 SOTA | 是 | — |
-| InfiniPot-V | [2506.15745](https://arxiv.org/abs/2506.15745) NeurIPS'25 | 2025-06 | 流式视频 KV 线性增长 | 硬内存上限 + 时间冗余(TaR) + 值范数(VaN) 排序 | 峰值显存 -94%，多轮对话保持精度 | 是 | 端侧目标但实验在 GPU；未读 |
+| InfiniPot-V | [2506.15745](https://arxiv.org/abs/2506.15745) NeurIPS'25 | 2025-06 | 流式视频 KV 线性增长 | 硬内存上限 + 时间冗余(TaR) + 值范数(VaN) 排序 | 峰值显存 -94%，多轮对话保持精度 | 是（query-agnostic） | 已核实摘要；端侧目标，实验硬件未核 |
 | METok | [2506.02850](https://arxiv.org/abs/2506.02850) | 2025-06 | 长视频 | 多阶段事件级压缩 | — | 是 | — |
 | ERASE / HAWK / SepPrune / Structured Redundancy | [2605.09982](https://arxiv.org/abs/2605.09982) / CVPR'26 / 2026-07 / [2607.23046](https://arxiv.org/abs/2607.23046) | 2026 | Qwen2.5-VL 高分辨率 | 两阶段剪枝（85% 剪枝保 89.5% vs 先前 78.1%）/ 头重要性感知（剪 80.2% 保 96.0%）/ 分隔符 token 作统一 query / 结构化冗余建模（报告 CDPruner/DivPrune/D²Pruner 选择开销） | — | 是 | 都未涉及多图交错输入 |
 | TOPS | [2606.27161](https://arxiv.org/abs/2606.27161) | 2026-06 | 第一性原理重述剪枝 | 任务相关性+信息覆盖+语义多样性的「最优保留集」 | LLaVA-NeXT 剪 77.8% 保 ~100%；7 backbone 14 benchmark | 是 | 以图像为主 |
 | IPCV | [2512.18747](https://arxiv.org/abs/2512.18747) | 2025-12 | 在 ViT 内压缩 | 邻居引导重建让被剪 token 参与注意力，进 LLM 前恢复 | 可与 LLM 侧剪枝叠加 | 是 | — |
-| QAPruner / Joint Q+P | [2604.02816](https://arxiv.org/abs/2604.02816) / [2604.17320](https://arxiv.org/abs/2604.17320) | 2026-04 | 剪枝 × PTQ 交互 | 语义剪枝会删掉激活离群 token → W4A4 误差上升；混合敏感度打分 / FlatQuant 扩到视觉塔+投影器 W4A4+KV4 | 12.5% 保留下 +2.24%，超过未剪枝稠密量化 | 是 | 自称首个联合优化 |
+| QAPruner / Joint Q+P | [2604.02816](https://arxiv.org/abs/2604.02816) / [2604.17320](https://arxiv.org/abs/2604.17320) | 2026-04 | 剪枝 × PTQ 交互 | 语义剪枝会删掉激活离群 token → W4A4 误差上升；混合敏感度打分 / QUOTA：FlatQuant 校准扩到视觉塔+投影器 W4A4+量化 KV，离线层级 token 配额（30% token 保 95.65%） | 12.5% 保留下 +2.24%，超过未剪枝稠密量化 | 是 | 自称首个联合优化 |
 
 ### 1.3 多模态 KV cache
 
@@ -69,7 +121,7 @@ TF = training-free。日期为 arXiv 首发（或会议）。
 | LOOK-M | [2406.18139](https://arxiv.org/abs/2406.18139) | 2024-06 | 剪视觉 KV 并把驱逐 token 合并进保留 token；被 MadaKV 批评为固定模态优先级 | 是 |
 | MadaKV | [2506.15724](https://arxiv.org/abs/2506.15724) ACL'25 | 2025-06 | 头有模态偏好 → 按头模态自适应驱逐；解码延迟 1.3–1.5× | 是 |
 | FlashCache | [2511.16786](https://arxiv.org/abs/2511.16786) CVPR'26 | 2025-11 | 自称首个 attention-score-free、FlashAttention 兼容的多模态 KV 压缩：频域低频能量主导，远离主能量的「Outlier KV」必须保留；1.69× 解码、-80% KV | 是 |
-| RetentiveKV | ACL'26 Findings | 2026 | 视觉 token 的重要性可能**在解码后期才出现**，「重要性持续」假设对视觉不成立；熵打分 + 状态空间记忆可重激活；5.0× KV、1.5× 解码 | 未确认 |
+| RetentiveKV | [2605.04075](https://arxiv.org/abs/2605.04075) ACL'26 Findings | 2026-04 | 视觉 token 的重要性可能**在解码后期才出现**（deferred importance），「重要性持续」假设对视觉不成立；熵打分 + 状态空间记忆可重激活；5.0× KV、1.5× 解码 | 非严格 TF（状态检索门控含可学习参数 W_r、b_r；已核实 HTML） |
 
 ### 1.4 投机 / 并行解码（无训练 draft）
 
@@ -82,9 +134,9 @@ TF = training-free。日期为 arXiv 首发（或会议）。
 | SparseSpec (reasoning) | [2512.01278](https://arxiv.org/abs/2512.01278) MLSys'26 | 2025-12 | 大规模推理模型稀疏自投机，2.13× 吞吐 | 是 |
 | Practical Investigation of Relaxed SD | [2607.08690](https://arxiv.org/abs/2607.08690) | 2026-07 | 基准：多数 relaxed 方法依赖 drafter 本身是好 LM，不适合轻量 MTP 头 | — |
 | Progressive Tree Drafting | [2607.10661](https://arxiv.org/abs/2607.10661) COLM'26 | 2026-07 | 综述内生 TF 草拟（Lookahead、Self-Draft 等） | 是 |
-| SparseSpec-L | [2607.27735](https://arxiv.org/abs/2607.27735) | 2026-07 | 目标模型用稀疏化、可召回的 KV 自草拟；复用验证期注意力统计做重要性信号；熵控制猜测长度；≤2.79×；猜测过长在接受率低于相对草拟成本时反而变慢 | 是 |
-| DraftExpert | [2607.24434](https://arxiv.org/abs/2607.24434) | 2026-07 | 专家卸载 MoE 的自投机：瓶颈是「专家扩张」而非 draft 长度 | 是 |
-| MMSpec + ViSkip | [2603.14989](https://arxiv.org/abs/2603.14989) | 2026-03 | 600 样本 6 类 10 种 SD 方法基准：文本 SD 在多模态退化（Lookahead 在 Qwen2.5-VL-7B 仅 1.07×，部分子任务更慢）；batch 越大视觉感知越重要；吞吐 speedup 不等于延迟；ViSkip 视觉相关性高时关闭投机（二手称 TF） | 是 |
+| SparseSpec-L | [2607.27735](https://arxiv.org/abs/2607.27735)（投稿 AAAI'27） | 2026-07 | 目标模型用稀疏化、可召回的 KV 自草拟；复用验证期注意力统计做重要性信号；熵控制猜测长度；≤2.79×（Llama-3.1-8B LongBench v2，3B–14B 1.55–2.79×；已核实）；纯文本；猜测过长在接受率低于相对草拟成本时反而变慢 | 是 |
+| DraftExpert | [2607.24434](https://arxiv.org/abs/2607.24434) | 2026-07 | 专家卸载 MoE 的自投机：瓶颈是「专家扩张」而非 draft 长度；每层自蒸馏训练一个轻量 draft expert；1.45× 吞吐、接受率 84–87% | **否**（需训练 draft expert；已核实） |
+| MMSpec + ViSkip | [2603.14989](https://arxiv.org/abs/2603.14989) | 2026-03 | 600 样本 6 类 10 种 SD 方法基准：文本 SD 在多模态退化（Lookahead 在 Qwen2.5-VL-7B 仅 1.07×，部分子任务更慢）；batch 越大视觉感知越重要；吞吐 speedup 不等于延迟；ViSkip：plug-and-play 门控，视觉相关性分数 S_t>τ 时关闭草拟改为目标模型自回归；门控本身无训练但叠加于其他 drafter（含训练式 ViSpec/MSD）| 是（门控；已核实 HTML） |
 | Fast-dLLM / Sparse-dLLM | [2505.22618](https://arxiv.org/abs/2505.22618) ICLR'26 / [2508.02558](https://arxiv.org/abs/2508.02558) | 2025 | dLLM 块级近似 KV cache + 置信阈值并行解码，≤27.6× 吞吐 / 动态 cache 驱逐再 10× | 是 |
 
 ### 1.5 PTQ / 旋转 / 无数据量化 / MLLM 量化
@@ -116,8 +168,8 @@ TF = training-free。日期为 arXiv 首发（或会议）。
 | 论文 | ID / 会议 | 日期 | 要点 | TF |
 |---|---|---|---|---|
 | Diminishing Returns of Early-Exit | [2603.23701](https://arxiv.org/abs/2603.23701) | 2026-03 | 新一代模型层冗余更低，早退收益逐代下降；稠密 > MoE/SSM；>20B 与 base 模型潜力更高；提出可早退性指标与基准 | 诊断 |
-| River-LLM / WAVE | ACL'26 long.1746 / ICML'26 | 2026 | token 级早退补 KV 缺口，1.71–2.16× / 离线校准退出窗口 + 代理 LM 头，Llama-2-7B ≤1.4× | 是 |
-| ACE | [2609.05228](https://arxiv.org/abs/2609.05228) | 2026-09 | MoE 无校准 token 自适应专家跳过，双视角都判低贡献才跳；50% 跳过最优 | 是 |
+| River-LLM / WAVE | ACL'26 long.1746（CrossRef 已确认存在，数字未核） / ICML'26（未核） | 2026 | token 级早退补 KV 缺口，1.71–2.16× / 离线校准退出窗口 + 代理 LM 头，Llama-2-7B ≤1.4× | 是 |
+| ACE | [2609.05228](https://arxiv.org/abs/2609.05228) | 2026-09 | MoE 无校准 token 自适应专家跳过，双视角都判低贡献才跳、保留 top-1；在 50%–60% 高跳过率下优势最明显（Qwen3.6-35B-A3B 50% 时 PPL -7.96%、精度 +4.15pt） | 是（已核实） |
 | Dropping Experts, Recombining Neurons / COMPEL / STUN | EMNLP'25 F / ACL'26 F / ACL'25 | — | 路由统计剪专家再神经元级重组 / Fisher 层感知专家剪枝 / 结构+非结构剪枝 | 部分 |
 | MoBiLE / FloE | [2510.12357](https://arxiv.org/abs/2510.12357) / [2505.05950](https://arxiv.org/abs/2505.05950) | 2025 | 消费级 GPU 卸载：不重要 token 专家数减半，1.60–1.72× / 隐藏专家 I/O，指出超低比特专家量化伤质量 | 是 |
 
@@ -145,7 +197,7 @@ TF = training-free。日期为 arXiv 首发（或会议）。
 - 推理模型解码期 KV 压缩（R-KV/RPC/ThinKV/BeaconKV/Moment-KV）：方法多，但「压缩导致输出变长」的机制未解释。
 - 长视频 / 流式视频 token 压缩（FLoC、InfiniPot-V、ForestPrune）：query-agnostic 与硬内存上限刚起步。
 - 多模态 KV 压缩（MadaKV/FlashCache/RetentiveKV）：FlashAttention 兼容与「视觉重要性迟发」刚被提出。
-- TF 自投机（SparseSpec-L、DraftExpert）：把 KV 稀疏当 draft 的思路刚出现。
+- TF 自投机（SparseSpec-L；DraftExpert 经核实需训练 draft expert）：把 KV 稀疏当 draft 的思路刚出现。
 
 **刚起步（蓝海）**
 - MLLM/VLM 上的 TF 投机解码（MMSpec 证明文本法失效，仅 ViSkip 一个门控）。
@@ -199,7 +251,7 @@ TF = training-free。日期为 arXiv 首发（或会议）。
 - **Method**：(1) 在 DeepSeek-R1-Distill-Qwen-7B / Qwen3-8B 上跑 SnapKV、R-KV、KIVI-2bit、Expected Attention，记录每个样本的生成长度分布、重复 n-gram 率、答案出现后继续生成的 token 数；(2) 用 token 级归因（删除哪些 KV 导致长度膨胀）定位是「结论锚点被驱逐」还是「自检循环」；(3) 提出 TF 修复：对「答案候选/结论标记」及其邻域 KV 加保护位，并用重复熵触发器配合 budget forcing 提前收尾；(4) 以端到端延迟（非 token/s）汇报。
 - **Hypothesis**：压缩拉长输出主要源于早期计划/结论锚点被驱逐导致的重复自检，保护 <2% 的锚点 KV 可消除 >70% 的长度膨胀。
 - **MVE**：模型 R1-Distill-Qwen-7B、Qwen3-8B；数据 AIME24/25、MATH500、LiveCodeBench 子集、LongBench 生成类；指标 准确率、平均长度、端到端延迟、峰值显存；单卡 A100-80G，约 40–60 GPU-h。
-- **Closest work**：2503.24000（发现现象未解释）、ThinKV 2510.01290（量化拉长，提出思维感知但未归因）、BeaconKV 2609.04971（重访 token，但目标是精度非长度）。不同点：第一个把「长度膨胀」作为一等目标并给出因果归因 + TF 修复。
+- **Closest work**：2503.24000（发现现象未解释；HTML 显示驱逐类方法在 LLaMA/Mistral-7B 上输出更 verbose）、ThinKV 2510.01290（ICLR'26 Oral；HTML Fig.10d：**纯量化**使 R1-Llama-8B 长度膨胀 ≤5.1×，但称**驱逐类不引起膨胀**——与 2503.24000 部分矛盾，需先在推理模型上确认驱逐是否也膨胀）、BeaconKV 2609.04971（重访 token，但目标是精度非长度）。不同点：第一个把「长度膨胀」作为一等目标并给出因果归因 + TF 修复。核实结论：三篇摘要均不含归因与锚点保护修复。
 - **Novelty 7/10 | Risk MEDIUM | Contribution：diagnostic + method**
 - **Reviewer objection**：现象是否在非推理模型上也存在；锚点保护可能等价于已有的「保留首尾 token」技巧。
 - **dedup_key**：kv-compression-output-length-inflation-anchor-protection
@@ -208,7 +260,7 @@ TF = training-free。日期为 arXiv 首发（或会议）。
 - **Method**：(1) 图像/视频 prefill 后，用 MLLM 自身以「描述这张图/这段视频」为 pseudo-query 做一次重建前向，取重建注意力作为视觉 KV 的 query-agnostic 重要性（KVzip 思路迁移）；(2) 对低分视觉 KV 做 GRKV 式岭回归合并而非直接丢弃，保留「迟发重要性」通道；(3) 压缩后的 cache 作为 prefix 被同一图像的多个问题复用；(4) 对比 query-aware 剪枝在多问设置的退化。
 - **Hypothesis**：在「同图多问」设置下，重建式 query-agnostic 打分在 20% 视觉 KV 预算下比 VisionZip/SparseVLM 等 query-aware 方法高 ≥5 点，并允许 prefix cache 命中。
 - **MVE**：Qwen2.5-VL-7B、LLaVA-OneVision-7B；数据 MMBench/SEED（同图多问重组）、VisDial、Video-MME 多问子集；指标 准确率@预算、prefix 复用率、解码延迟；单卡 48–80G，约 30 GPU-h。
-- **Closest work**：KVzip 2505.23416（文本）、RetentiveKV ACL'26（重激活但疑似需训练）、FlashCache 2511.16786（attention-free，但 query 无关性未针对多问评测）。
+- **Closest work**：KVzip 2505.23416（纯文本，HTML 无视觉实验）、RetentiveKV 2605.04075（熵+状态空间重激活，含可学习门控参数，非重建式）、FlashCache 2511.16786（attention-free，HTML 无多问/prefix 复用评测）。核实结论：三篇摘要均不含「重建式 query-agnostic 视觉 KV 打分 + 同图多问复用」。
 - **Novelty 7/10 | Risk MEDIUM | Contribution：method**
 - **Reviewer objection**：重建前向增加一次 prefill 成本；多问基准是重组而非原生。
 - **dedup_key**：query-agnostic-visual-kv-reconstruction-multiquery
@@ -217,8 +269,8 @@ TF = training-free。日期为 arXiv 首发（或会议）。
 - **Method**：(1) 无标签估计每个 MLLM 的「地平线层」：逐层测删 token 对输出分布的 KL 变化并找拐点（2512.07580 的度量，改为校准集 50 张图即可）；(2) 地平线前用去偏注意力（2508.17807）剪枝，地平线后改用空间/时间均匀 + 随机保留；(3) 在高分辨率与视频上重复，检验地平线是否前移；(4) 报告 latency 而非 FLOPs。
 - **Hypothesis**：地平线层随输入 token 数增加而前移；混合策略在 ≥80% 剪枝时优于单一策略且几乎零额外开销。
 - **MVE**：LLaVA-1.5-7B、Qwen2.5-VL-7B、LLaVA-Video-7B；数据 TextVQA/DocVQA（高分辨率）、Video-MME；单卡 24–48G，约 20 GPU-h。
-- **Closest work**：2512.07580（诊断，未给出自适应方法）、2502.11501（主张均匀）、HoloV 2510.02912（空间 crop 预算，但全层统一）。
-- **Novelty 5/10 | Risk LOW | Contribution：method + diagnostic（可作为 workshop/短文）**
+- **Closest work**：2512.07580（**核实后风险上调**：其摘要已提出「深层随机剪枝」并把随机剪枝与 DART/DivPrune/FastV 组合——即浅层现有方法+深层随机——且指出地平线随任务与模型能力移动；未做的只是无标签自动估计地平线层、去偏注意力与视频/高分辨率外推）、2502.11501（主张均匀）、HoloV 2510.02912（空间 crop 预算，但全层统一）。
+- **Novelty 3/10（核实后下调） | Risk MEDIUM | Contribution：method + diagnostic（可作为 workshop/短文）**
 - **Reviewer objection**：增量式；地平线可能与特定 benchmark 耦合。
 - **dedup_key**：depth-adaptive-random-vs-attention-visual-pruning
 
@@ -226,7 +278,7 @@ TF = training-free。日期为 arXiv 首发（或会议）。
 - **Method**：(1) 取 Llama-3.1-8B / Qwen2.5-7B 的 QuaRot/SpinQuant/OptRot W4A4(+KV4) 版本，叠加 SnapKV、K-Norm、Expected Attention、FlashCache 风格打分；(2) 测量打分排序与 FP16 版本的 Spearman 相关及最终精度差；(3) 若失效，提出在旋转空间重新估计 query 分布/范数统计（闭式、无需校准数据）的修正；(4) 给出「量化 × 驱逐」的组合推荐表。
 - **Hypothesis**：Hadamard 旋转使 K 范数与注意力分布趋于各向同性，范数/分布类打分 (K-Norm、Expected Attention) 在 W4A4 下相关性显著下降，而观察窗类 (SnapKV) 相对稳健。
 - **MVE**：上述模型；LongBench、RULER 32K、GSM8K；指标 精度、排序相关、显存；单卡 80G，约 25 GPU-h（量化模型可用公开权重）。
-- **Closest work**：QAPruner 2604.02816（视觉 token 剪枝 × PTQ，证明交互存在）、2604.17320（FlatQuant 扩展到 VLM，无驱逐）、RDKV/HqeKV（KV 量化×驱逐，但权重为 FP16）。不同点：首次系统评测权重旋转量化与 KV 驱逐的交互。
+- **Closest work**：QAPruner 2604.02816（视觉 token 剪枝 × PTQ，证明交互存在）、2604.17320（QUOTA：FlatQuant 校准扩展到 VLM 的联合量化+token 剪枝，无 KV 驱逐）、RDKV/HqeKV（KV 量化×驱逐，但权重为 FP16）。不同点：首次系统评测权重旋转量化与 KV 驱逐的交互。
 - **Novelty 6/10 | Risk LOW | Contribution：diagnostic + fix**
 - **Reviewer objection**：若交互很小，贡献变成「负结果」；需保证量化实现一致。
 - **dedup_key**：kv-eviction-under-rotation-quantization
@@ -235,7 +287,7 @@ TF = training-free。日期为 arXiv 首发（或会议）。
 - **Method**：(1) 草拟阶段用深层视觉 token 剪枝（仅保留 10–20%）+ 浅层早退的同一模型生成 k 个 token；(2) 验证阶段用全 KV 并行校验（标准 SD 无损）；(3) 用 ViSkip 式视觉相关性门控与 SparseSpec-L 式熵控制器自适应 k；(4) 在 MMSpec 六类任务上报 speedup 与 p99 延迟。
 - **Hypothesis**：因视觉 token 占 VLM KV 的 >80% 且深层信息「消失」，剪枝版自草拟接受率 >0.8，整体 1.6–2.2× 加速，优于 Lookahead (1.07×) 且无需训练。
 - **MVE**：Qwen2.5-VL-7B、LLaVA-1.5-7B；MMSpec 基准 + Video-MME 短答；指标 walltime speedup、接受长度、p99；单卡 48–80G，约 30 GPU-h。
-- **Closest work**：SparseSpec-L 2607.27735（文本、稀疏 KV 草拟）、MMSpec/ViSkip 2603.14989（门控不草拟）、LayerSkip（需训练）。不同点：视觉 token 剪枝作为 draft 机制是新的，且利用了 2512.07580 的发现。
+- **Closest work**：SparseSpec-L 2607.27735（纯文本、稀疏 KV 草拟，HTML 无 VLM 内容）、MMSpec/ViSkip 2603.14989（门控不草拟，HTML 无剪枝内容）、LayerSkip（需训练）。核实结论：摘要均不含「视觉 token 剪枝版自我作 drafter」。不同点：视觉 token 剪枝作为 draft 机制是新的，且利用了 2512.07580 的发现。
 - **Novelty 7/10 | Risk MEDIUM | Contribution：method**
 - **Reviewer objection**：草拟仍需跑全部层，加速上限受限；与 EAGLE 类训练 drafter 相比速度可能不占优。
 - **dedup_key**：visual-token-pruned-self-speculative-decoding-vlm
@@ -244,7 +296,7 @@ TF = training-free。日期为 arXiv 首发（或会议）。
 - **Method**：(1) 构建压缩评测：BFCL、τ-bench、多轮 SWE-style 轨迹，在 SnapKV/H2O/StreamingLLM/KVzip/Expected Attention 下测工具调用合法率、参数正确率、指令遵循；(2) 诊断哪些片段（system prompt、tool schema、历史 observation）最先被驱逐（Pitfalls 方法）；(3) 提出按「段类型」分配预算、schema 段 KV 冻结 + observation 段激进压缩的 TF 策略；(4) 测多轮下的 prefix 复用兼容性。
 - **Hypothesis**：标准驱逐优先丢弃 tool schema 的 JSON 字段，使合法调用率在 50% 预算下下降 >15 点；段感知预算可几乎恢复。
 - **MVE**：Qwen2.5-7B-Instruct、Llama-3.1-8B；单卡 48G，约 30 GPU-h。
-- **Closest work**：Pitfalls 2510.00231（IFEval，非 agent）、ST-Lite 2603.00188（GUI 截图）、UltraQuant 2606.20474（量化）。不同点：首个工具调用 agent 的压缩基准 + 段感知策略。
+- **Closest work**：Pitfalls 2510.00231（IFEval，非 agent）、ST-Lite 2603.00188（GUI 截图）、UltraQuant 2606.20474（PTQ 型 4-bit KV 量化，EMNLP'26 Industry；用 Claude Code 生产轨迹做多轮 agent 评测，但不做驱逐/段感知）。不同点：首个工具调用 agent 的压缩基准 + 段感知策略。
 - **Novelty 6/10 | Risk LOW | Contribution：benchmark + method**
 - **Reviewer objection**：段感知预算是启发式；agent 轨迹长度可能还没到需要压缩的量级。
 - **dedup_key**：tool-calling-agent-kv-compression-segment-aware-budget
@@ -253,9 +305,9 @@ TF = training-free。日期为 arXiv 首发（或会议）。
 - **Method**：(1) 复现 Physics 2603.01426 的 90% 悬崖，在 RULER 多长度与真实任务上找悬崖位置与序列长度、模型家族的关系；(2) 设计无训练在线代理（Global Eviction Ratio、头间注意力一致性熵），在 prefill 结束时即可计算；(3) 根据代理动态选每请求压缩率（长序列更激进，Sparse Frontier 结论），而非固定 budget；(4) 与固定预算 SnapKV/PyramidKV/LAVa 在相同平均内存下比较。
 - **Hypothesis**：悬崖位置是序列长度与模型家族的可预测函数；同等平均内存下自适应压缩率比固定预算提升 ≥3 点并消除尾部失败样本。
 - **MVE**：Llama-3.1-8B、Qwen2.5-7B/14B；RULER 4K–128K、LongBench；单卡 80G，约 40 GPU-h。
-- **Closest work**：Sparse Frontier 2504.17768（指出固定预算次优，未给控制器）、Physics 2603.01426（悬崖诊断，合成任务）、LAVa（动态分配但总预算固定）。
-- **Novelty 6/10 | Risk MEDIUM | Contribution：method + diagnostic**
-- **Reviewer objection**：代理指标可能只是序列长度的函数；悬崖可能是 benchmark 伪影。
+- **Closest work**：Sparse Frontier 2504.17768（指出固定预算次优，未给控制器）、Physics 2603.01426（悬崖诊断，合成任务，HTML 无在线控制器）、LAVa（动态分配但总预算固定）、**Compactor 2507.08143（核实后新增风险：摘要已含「context-calibrated compression」——按 NLL 增幅阈值推断每个上下文可承受的最大压缩率，LongBench 平均省 68% 无损；即已有每请求自适应压缩率的 TF 实现）**。本 idea 的差异需落在：以悬崖/头一致性为代理而非 NLL、覆盖多方法与长度外推、消除尾部失败。
+- **Novelty 5/10（核实后下调，Compactor 已做 context-calibrated） | Risk MEDIUM | Contribution：method + diagnostic**
+- **Reviewer objection**：Compactor 已有按上下文校准压缩率的做法；代理指标可能只是序列长度的函数；悬崖可能是 benchmark 伪影。
 - **dedup_key**：per-request-adaptive-kv-budget-hallucination-cliff
 
 ### Idea 8：Uniform-Is-All-You-Need? 视频 token 压缩的公平基线审计与时间地平线
@@ -271,7 +323,7 @@ TF = training-free。日期为 arXiv 首发（或会议）。
 - **Method**：(1) 在 Qwen3-30B-A3B / DeepSeek-V2-Lite（MLA）上评测 SnapKV/Expected Attention/KVzip：MLA 的压缩潜变量能否再驱逐、驱逐后精度如何；(2) 与 ACE 专家跳过叠加，看两者是否互补（KV 驱逐减少注意力带宽，专家跳过减少 FFN 计算）；(3) 分析被驱逐 token 与被跳过专家的相关性（是否同一批「低贡献」token）。
 - **Hypothesis**：MLA 潜 KV 对驱逐更敏感（每个潜向量承载更多信息），需更保守预算；但 token 级驱逐与专家跳过决策高度相关，可共享一个打分。
 - **MVE**：上述两模型（单卡 80G 可放下 A3B 级）；LongBench、GSM8K、RULER 16K；约 40 GPU-h。
-- **Closest work**：ACE 2609.05228（专家跳过）、2603.23701（MoE 早退潜力低）、DraftExpert 2607.24434（MoE 自投机）。KV 驱逐在 MLA/MoE 上几乎无评测。
+- **Closest work**：ACE 2609.05228（专家跳过）、2603.23701（MoE 早退潜力低）、DraftExpert 2607.24434（MoE 自投机，需训练 draft expert）。核实：ACE HTML 无 KV cache/MLA 内容；KV 驱逐在 MLA/MoE 上几乎无评测。
 - **Novelty 6/10 | Risk MEDIUM | Contribution：diagnostic + method**
 - **Reviewer objection**：MLA 已经是压缩，再压缩收益可能很小；需要自定义 kernel 才能体现速度。
 - **dedup_key**：kv-eviction-expert-skipping-mla-moe
@@ -303,4 +355,4 @@ TF = training-free。日期为 arXiv 首发（或会议）。
 
 次优但低风险：Idea 4（旋转量化 × KV 驱逐审计）、Idea 6（ToolKV 基准）。
 
-**限制**：本次 arXiv/HF/OpenReview 全部被代理阻断，仅凭搜索摘要核实；RetentiveKV、ViSkip 是否 training-free、LU-KV/MixedDimKV 的 profiling 需求等需在可访问环境二次确认。
+**限制**：初稿时 arXiv/HF/OpenReview 被代理阻断，仅凭搜索摘要；2026-10-17 已按 §0.5 用 arXiv abs/HTML 二次核实主要条目：RetentiveKV=2605.04075（非严格 TF）、ViSkip 为无训练门控、LU-KV 需离线 profiling、MixedDimKV 基础版无需 profiling、DraftExpert 需训练；核实后 Idea 3（2512.07580 已含深层随机+组合策略）与 Idea 7（Compactor 已含 context-calibrated compression）的新颖性下调。
