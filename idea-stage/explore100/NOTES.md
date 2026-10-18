@@ -1074,3 +1074,150 @@
 - 与第 18 篇（checklist 奖励）、第 66 篇（BoP，推理时近似 RLHF）、第 64 篇（ECHO）是同一族思路的 training-free 版本："**KL 正则 RL 的最优策略 = 参考分布 × exp(βA)**"，只要能在推理时估计出 A，就不需要梯度。
 - 自然的扩展：在 token 级而非动作级做，只在分叉 token 处用检索到的优势调 logit（结合熵门控）。这可能是 RL 能"锐化"分叉点（第 1、39 篇）的一个 training-free 近似。值得查新。
 - 局限：只能在基模型提出的候选动作中重新加权，无法发现新动作。这与第 1 篇"RL 不扩展能力边界"一致。
+
+## 70. Conditional Memory via Scalable Lookup: A New Axis of Sparsity（ACL'26；PKU + DeepSeek-AI）
+**一句话**：在 MoE 之外再加一条“条件记忆”稀疏轴（DSE）：用 suffix N-gram 的哈希 O(1) 查一张巨型 embedding 表，再用 hidden state 当 query 做门控后注入残差。固定总参数和激活参数时，把约 20–25% 的非激活参数从 expert 挪给查表，loss 曲线呈 U 型，最优点稳定在 ρ≈0.75–0.8。
+**原文里有意思的发现**：
+- 涨点最大的不在知识类任务，而在推理和代码：BBH +5.0、ARC-C +3.7、HumanEval +3.0，MMLU 只有 +3.0。作者的解释是早期层不用再“现算”静态查表，等于多出了有效深度。CKA 显示 DSE 第 5 层的表征对齐 MoE 的第 12 层左右，LogitLens 的 KL 在早期层下降明显更快。
+- 长上下文：在 iso-pretrain-loss 条件下，Multi-Query NIAH 97.0 vs 84.2，Variable Tracking 87.2 vs 77.0。解释是局部模式交给查表后，attention 能专心处理全局依赖。
+- 附录里的 ablation 最有意思：
+  - 把 gate 置零后，TriviaQA 只剩 29%，事实知识类保留 29–44%；阅读理解类（C3）还剩 93%。也就是说参数化知识主体搬进了这张哈希表，backbone 主要负责“读上下文”。
+  - 反过来强行全量注入（去掉门控）后，TriviaQA 回升到 60%，C3 却掉到 56%。
+- 门控被激活的位置是：高熵实体（"piston rings"、"Corolla"）、精确数字（"55 mph"）、结构连接词（"and"、"Because"）、固定短语。
+- 查表规模 1e7 slots（+13B 参数）以内，loss 和 log M 呈线性。100B 参数的表放在 host DRAM，推理吞吐只掉 2–3%。
+**我的看法**：
+- “关掉记忆后知识崩、阅读理解基本保留”这个双分离，几乎是一个可控的“知识/推理解耦”模型。它天然适合做知识编辑和遗忘：改哈希表的行，就不用碰 backbone。也可以研究幻觉：门控低但模型仍然自信的地方是不是在编。
+- 另一个推论：dense 模型早期层很大一部分算力花在“重建 n-gram 查表”上。这和 #21 FFN Fusion、#28 looped 模型里“早期层可压缩”的现象是同一件事的两面。
+- 门控激活位置和 #1/#10 的 forking token 是否重合（高熵实体、数字），可以直接用开源 checkpoint 去测。
+
+## 71. Rewarding the Unlikely: Lifting GRPO Beyond Distribution Sharpening（EMNLP'25；CMU Welleck 组）
+**一句话**：在 Lean 定理证明（完美 verifier）上发现 GRPO 有 rank bias：只抬高 base 模型里本来概率就高的正确证明，低概率的正确证明几乎从不被抬升。所以 pass@512 反而低于 base。解法是 unlikeliness reward：对组内概率排名高的正确解乘一个惩罚（β=0.25）；另一个解法是增大 PPO epochs。
+**原文里有意思的发现**：
+- 简单推算：要提升 pass@N，必须抬高 p0≈1/N 的那批解。clip 上限 1+ε 意味着每个正样本最多只能被放大 1.2 倍，所以大 N 的收益本来就小。
+- uplift rate 按组内排名统计：排名靠前的正确解大多被抬升，排名最末的几乎为 0。作者强调这与 DAPO 归因的 clip-higher 是不同的机制。
+- 反直觉的一点：PPO epochs 从 1 增加到 2、3，多样性反而上升（unique proofs 变多），尽管模型偏离初始分布更远。机制是高概率解在第一步就撞到 clip 上限失去梯度，后续几步只剩低概率解在学。epochs=4 时训练开始不稳。
+- 加了 unlikeliness reward 后，unique proof 数先降后升，表现出“自我纠正”：主导解被惩罚后，罕见解重新浮现。
+- 他们发现 miniF2F-test 方差太大，主实验改用 i.i.d. 的 held-out 集。这和 #65 的 SNR 问题是同一回事。
+**我的看法**：
+- “一个 batch 只更新一步”是 verl/DAPO 的默认设置，论文说这个默认值本身就在制造 sharpening。这是一个零成本、却很少被质疑的超参。
+- 和 #69 JitRL（logit += β·A）放在一起看：如果在推理时按“组内 rank”给优势加权，能不能 training-free 地复现 unlikeliness 的效果？
+- rank bias 在序列级成立。在 token 级是不是集中在 #1 讲的 forking token 上，也就是罕见解是不是在某几个分叉点选了低概率分支？可以用公开 rollout 数据来查。
+
+## 72. Exploring Attention Attractors in Large Language Models（ACL'26；人大 AIM3）
+**一句话**：被大量 attention 指向的“吸引子 token”不只是 sink。它们自己也会更均匀地去看远处 token，信息流的路径是 context → attractor → prediction，相当于信息汇聚枢纽。浅层的吸引子多是 "_the"、"\n"，中层多是撇号 "’"（Llama3 上则是 "didn"、"don"）。
+**原文里有意思的发现**：
+- 极简 KV 剪枝：只保留语料中最高频的 256 个 token 加 4 个 sink，KV 大约减半，LongBench 上和 L2Norm 方法打平，摘要任务尤其稳。剪完后的文本是 "and over the. T of fed anded the, and wed" 这种人完全读不懂的东西，模型照样能答。
+- 反例：TREC 分类任务里，label token 自己会成为吸引子（某些层超过 40%），只留高频词就会崩。
+- 浅层 attention 和单个激活维度的 Spearman 相关很强，深层变弱。把这个维度置零，PPL 只从 13.2 升到 14.3；置零随机维度几乎没影响。
+- 吸引子分布在浅层和中层两个峰，两段的 token 集合完全不同。
+**我的看法**：
+- “功能词携带上下文摘要”这件事意味着 KV 压缩里 token 的身份可以和信息解耦：一个 "the" 的 KV 里装的是它前面那一段话。和 #54 sink 几何、#47 ViT register 是同一类现象。
+- 文章本身偏描述性，因果实验很弱。它的价值主要在“高频词 KV 足以支撑摘要”这个反直觉的工程事实。
+
+## 73. Multimodal Language Models See Better When They Look Shallower（EMNLP'25；宁波东方理工 等）
+**一句话**：CLIP-ViT 的 24 层逐层接到 LLM 上各训一个 MLLM（1.4B–7B，10 个 benchmark）。最后一层在任何 benchmark 上都不是最优，倒数第二层整体最好；但计数、位置、存在性、空间关系这类任务上，中层（第 18 层）更好，Position 任务高出约 20%。
+**原文里有意思的发现**：
+- OCR 在第 12 层有一个陡峭的相变：前 12 层几乎无用，之后迅速上升。即使补充 OCR 训练数据、换更大的 LLM，第 3 层的 OCR 也完全不涨。作者解释为浅层特征和文本空间根本不对齐，connector 救不回来。
+- 反直觉：MME-Cognition 里的 Code Reasoning、Numerical Calculation，第 3 层（很“乱”的浅层特征）反而最好。作者的解读是认知类任务不受视觉特征质量限制。结合 #44 和 #49 的结论，我更倾向于认为这些题大部分靠语言先验就能做。
+- POPE（幻觉）不随 LLM 变大而改善，但随视觉层的选择明显变化：浅层幻觉最多，中层和深层差不多。说明幻觉瓶颈在视觉表征一侧。
+- 数据和 LLM 越大，倒数第二层占优的子任务越多。也就是说深层里的细粒度信息“藏得更深”，需要更多数据才能被 LLM 挖出来。
+- 不重新训练、直接把输入层换成 20–24 层中的任意一层，不会崩。
+- 简单 concat {3,18,23} 三层，效果胜过 DenseConnector 和 MMFuser。
+**我的看法**：
+- “中层更适合空间/计数”与 #42 nonlocal 视觉推理失败、#46 head 分工可以串起来：现有 MLLM 的视觉 token 来自为 CLS 对齐优化过的层，空间信息在那里已经被压掉了。
+- training-free 的方向：推理时按问题类型动态切换 ViT 层，或者把中层特征作为额外 token 注入。不过需要模型在训练时见过多层特征，所以不算真正的零训练。
+
+## 74. Massive SFT Experiments Reveal How Data, Layer, and Training Factors Shape Alignment（EMNLP'25；NII LLMC / 东大）
+**一句话**：12 个约 7B 的 base 模型（英、中、日）× 10 个 SFT 数据集 × full/LoRA × 1k/20k 样本，共训了 1070 个模型。结论是 base 模型对 SFT 数据的 PPL 越低，SFT 收益越大；这个预测力超过训练集和测试集的语义相似度。和收益最相关的是中层（约 0.6 深度）的权重变化，而不是变化幅度最大的顶层。
+**原文里有意思的发现**：
+- 权重变化量随层数单调上升，但“变化量和收益的相关”在 0.6 处达峰。改得最多的层不是起作用的层。0.6 处的 intrinsic dimension 在 SFT 后开始明显上升，跨模型的权重变化在这一层最相似。
+- 把 1070 个模型的 token log-likelihood 向量做 t-SNE：聚类几乎完全由模型家族决定，SFT 数据只造成很弱的分离。各数据集的 epoch 轨迹都螺旋收敛到同一个“指令遵循区域”。
+- 20k 样本的模型落在流形外圈，1k 的在核心区，准确率上 20k 没有一致优势。LoRA 和 full-FT 的轨迹几乎重合。
+- 精挑细选的 LIMA 在受控设置下不如 Alpaca/UltraChat。FLAN 对多数任务有害。纯英文 SFT 在 MMLU-zh/jp 上的增益和英文 MMLU 强相关。
+- 数据集之间的协同/冲突关系非常依赖模型（同一对数据在 A 模型互补、在 B 模型冲突），而 benchmark 之间的相关跨模型很稳定。
+**我的看法**：
+- “低 PPL 数据更好”和 #32 EvoLM、#55（非标准分词鲁棒性来自 SFT）一起，说明 SFT 主要在“对齐格式”，而不是教新东西。PPL 可以当作一个零成本的数据筛选器，但需要排除“PPL 低是因为数据太简单”这个混淆。
+- 0.6 深度这个位置在很多论文里反复出现：#33 sparse attention 涌现、#60 neuron agreement、#56 assistant axis 的提取层。值得问一句：是不是所有“行为切换”都发生在 0.6 深度？
+
+## 75. When Long Helps Short: How Context Length in SFT Affects LLM Behavior（EMNLP'25；上交 X-LANCE）
+**一句话**：同一个 ProLong-512k base、同样 1B token 预算，用长上下文 SFT 数据（ChatQA2、LongMIT、LongAlpaca）训练，短上下文任务（MMLU、GSM8K、BBH）平均反而更好。这和“长文继续预训练会伤短任务”的共识正好相反。
+**原文里有意思的发现**：
+- 模块互换实验：
+  - 把 UltraChat-SFT 模型的 attention 整体换成 ChatQA2-SFT 的，GSM8K 从 54.7% 升到 67.8%；反方向从 68.8% 降到 65.2%。
+  - FFN 互换在 World Capital 上也是长上下文 SFT 的版本更好（90.6 → 92.9）。
+  - 说明两个模块都被单独增强了，而且它们可以拼接（不同 SFT 模型的 attention 和 FFN 拼起来仍能工作）。
+- 知识冲突测试（“石家庄是美国的新城市。石家庄在中国吗？”）：短上下文 SFT 的模型 99.8% 坚持参数知识，长上下文 SFT 的只有 50%，相当于随机。长上下文 SFT 让模型对上下文过度信任。
+- 混合比例：GSM8K 在 50/50 时最好，MMLU 在纯长上下文时最好。
+**我的看法**：
+- attention 和 FFN 可以跨 SFT 模型互换、而且效果可以叠加，这比 model merging 粒度更细：可以“用 A 数据训的 attention 搭配 B 数据训的 FFN”。这和 #21 FFN Fusion、#27 PoLar 都在说明模块之间耦合很松。
+- 长上下文 SFT 导致“盲信上下文”，对 RAG 和 prompt injection 是一个直接的安全隐患，也可以解释部分 agent 被工具输出带偏的现象（#62 MAS 失败、后面要读的 a267 Reasoning Trap）。
+
+## 76. The Reasoning Trap: How Enhancing LLM Reasoning Amplifies Tool Hallucination（ACL'26；PSU / 南理工 / 蚂蚁）
+**一句话**：SimpleToolHalluBench 只测两件事：没有任何工具时（NTA）、只给一个无关工具时（DT），模型能不能承认做不到。结论是推理能力增强（工具 RL、纯数学 GRPO、R1 蒸馏、Qwen3 开 thinking）都会让工具幻觉系统性上升。
+**原文里有意思的发现**：
+- 最戏剧化的一组数字：Qwen2.5-7B 经过 ReCall（工具 GRPO）后，NTA 幻觉从 34.8% 升到 90.2%，DT 从 54.7% 升到 100%。同时 IFEval 只降 2.6%，BFCL 工具调用能力反而升 9.9%。现有的工具和指令遵循 benchmark 完全看不到这个失败模式。
+- 只在 GSM8K 上做 GRPO（训练里完全没有工具），工具幻觉也随训练步数单调上升。
+- 消融：同样的 RL、数据和奖励，只是去掉 `<think>` 直接调用工具，幻觉只从 34.8% 升到 41.4%；加上 think-then-act 就到了 90.2%。罪魁是“先想”这个步骤本身。
+- CKA：数学 RL 后，in-distribution 表征 CKA > 0.9，工具类输入在早中层掉到 < 0.75。正确和幻觉的线性可分性集中在 20 层以后的残差流（0.14），attention/MLP 输出几乎不可分（0.02–0.04）。
+- 在 system prompt 里写“不许用没给你的工具”几乎没用。DPO 能降幻觉，但 SynTool reward 明显下降。
+**我的看法**：
+- 这是 #43 的镜像。#43 是“思考模型说要看图却不看”，这里是“思考模型说要调工具就编一个出来”。都属于 thinking 让模型更倾向于“行动和叙事的连贯”，而不是“对环境如实”。#58 的结论（verbalization 没有因果效应）也是同一个方向。
+- “只在数学上 RL 也会增加工具幻觉”说明 RL 改的是一个全局的“不弃权 / 填补空白”倾向。可以测一下：同样的 RL 是否也会降低 #52 AbsenceBench 的表现、降低“我不知道”的比例。如果三者是同一个方向（一个“abstention 方向”），就能在推理时 steer 回来，而不用像 DPO 那样牺牲能力。
+
+## 77. Language of Thought Shapes Output Diversity in LLMs（ACL'26；SUTD iNLP）
+**一句话**：在 `<think>` 后面插入一句翻译成目标语言的“Okay, the user is asking”，强制模型用另一种语言思考，同时让最终答案保持英文。结果是用非英语思考，英文输出的多样性就更高；思考语言在表征空间里离英语越远，多样性增益越大（Pearson 0.72–0.88）。
+**原文里有意思的发现**：
+- Qwen3-8B 用希伯来语（iw）思考，NoveltyBench 的 Distinct Score 比英语高 12.8 个点。中文和马来语增益最小（它们在 thinking 空间里离英语最近）。质量只降 1–2 分。
+- 不同思考语言在中间层也明显可分。这和“中间层是语言无关的概念空间”的通行说法相矛盾。
+- Mixed-Language（每个样本随机换一种语言）在 M=200 时 distinct 数增长的饱和速度远慢于任何单一语言，相当于抬高了多样性天花板。去掉 k 种语言造成的多样性下降是超线性的，说明各语言之间是互补关系。
+- Mixed-Language 在 T=1.0 时的多样性约等于英语在 T=2.0 时的多样性。在文化多元（BLEND、WVS）测试上，它胜过高温采样、“请给新颖答案”和多语言 prompt。
+**我的看法**：
+- 对 #53 Artificial Hivemind 的同质化问题，这是一个零训练的解法。更重要的是，它把多样性来源从 token 级的随机性搬到了“轨迹所在的区域”，比温度更结构化。
+- 可以直接用在 RL rollout 上：GRPO 的组内多样性不够（#71 rank bias、#30），那么让组内各样本用不同语言思考，能不能提升 pass@k 或探索？这几乎是零成本的实验。风险是不同语言的思考准确率不同，作者只测了开放式问题。
+
+## 78. To Think or Not to Think: The Hidden Cost of Meta-Training with Excessive CoT Examples（ACL'26；Stanford + LinkedIn）
+**一句话**：在合成的 CoT-ICL Lab（随机 DAG 加随机 MLP 生成链式 token）上做 meta-training。如果训练序列里 in-context 示例全是 CoT（α=0），推理时一旦 CoT 示例变少，准确率就崩：TF-12 从 0.93 掉到 0.18。按幂律调节 CoT 和 non-CoT 示例的混合比例（CoT-Recipe，α=2），即使 prompt 里没有任何 CoT 示例，Force Think 仍能达到 0.78。
+**原文里有意思的发现**：
+- α=∞（训练时从没见过 CoT）的模型，Force Think 准确率约等于 0。也就是说“会思考”完全来自训练分布，不会凭空出现。
+- OOD（更长输入）时，Force Answer 的峰值常常不低于 Force Think：模型生成不出所需数量的思考步，强制思考也没用。
+- Qwen2.5 的 8 个模型（包括 R1-distill）在 CIL-LangSym（随机小写单词 + DAG + 字符串切片）上 ICL 准确率全部为 0。只用 1000 条 SFT 后，7B 达到 0.67，0.5B 只有 0.004。规模门槛非常陡。
+- 最终答案正确的样本里约 80% 中间步骤全对；最终答案错误的样本里约 30% 中间步骤也全对。“步骤对、答案错”的比例不低。
+**我的看法**：
+- 和 #49（no-thinking RFT 在感知任务上更好）、#76（think 步骤放大工具幻觉）放在一起，形成一条线：thinking 和 non-thinking 的混合比例本身是一个重要但没被认真研究的超参。现在的混合推理模型（Qwen3 的 /think 和 /no_think）怎么配比基本是拍脑袋。
+- 合成框架很干净，适合拿来做机理研究，比如测“CoT 示例比例”如何影响 #1 forking token 的位置。
+
+## 79. Why Do Some Inputs Break Low-Bit LLM Quantization?（EMNLP'25；USC Robin Jia 组）
+**一句话**：3–4 bit 的 weight-only 量化方法（GPTQ、AWQ、NF、EfficientQAT）在 FineWeb 上的样本级误差高度相关（50 对方法平均 ρ=0.82，top-10% 大误差集合的 Jaccard 为 0.51）。所以哪些样本会坏，是全精度模型自己决定的，和量化方法关系不大。
+**原文里有意思的发现**：
+- 反直觉：大误差样本的残差流范数反而更小（Llama3-70B 最后一层 ρ≈−0.8）。这和“激活大、离群值多会放大量化误差”的通行认知相反。
+- 机制是 RMSNorm 的反转效应：大误差样本的离群值少（kurtosis 低），而 RMSNorm 的 γ 恰好给最大的离群维度分配最小的权重。于是离群值少的样本在归一化后整体幅度反而更大，更大的输入持续放大量化后权重的误差，并逐层累积。
+- 早退出分析：大误差样本前 ~36 层的 NLL 一直偏高，最后几层才急剧下降，非常依赖后层“精修”。但把后 18% 的层恢复成 16 bit，PPL 只从 8.67 降到 8.05（全精度是 5.60）。问题出在累积到后层的激活噪声，而不是后层权重本身。
+- Patching：只 patch MLP gate 的输出（或 gate 的输入），效果接近 patch 整个 MLP；patch attention 几乎没用；把 W_gate 恢复成 16 bit 也没用。
+- 长尾样本（全精度 NLL 高）的量化误差反而小。PopQA 中等热度（log pop 2.8–4.8）的实体掉点最多（>10%），最冷门和最热门的都比较稳。
+**我的看法**：
+- 和 #10（量化伤 forking token）合起来看，量化伤害有两个预测器：token 级的高熵，和样本级的“残差范数小、依赖后层精修”。可以检验这两者是否同源：依赖后层精修的位置是否就是高熵分叉点。
+- “模型自己决定哪些样本对噪声敏感”可以 training-free 地用起来：用全精度模型的最后一层范数做路由，敏感样本走高精度路径（混合精度服务）。
+- “长尾知识不怕量化，中等热度最怕”这一点也很反直觉。可能是因为长尾知识本来就没学会，没什么可丢的。
+
+## 80. The Illusion of Specialization: Domain-Invariant "Standing Committee" in MoE（ACL'26；The Fin AI / Georgia Tech / Stevens）
+**一句话**：在 OLMoE、Qwen3-30B-A3B、DeepSeek-V2-Lite 上，把 MMLU 归成 9 个领域，统计 routing mass。发现每层都有 2–5 个“常委”专家，跨领域稳定吃掉最多 70.5% 的路由质量。各领域 top-k 专家集合的 Jaccard 约 0.87，Gini > 0.88。DeepSeek 已经有 shared expert，routed 专家里照样长出常委。
+**原文里有意思的发现**：
+- 专家池越大，集中度越高（Qwen3 E=128，Gini 0.9465）。多出来的专家没有带来更多分工，反而加剧了寡头化。
+- 常委对应的 token 是推理框架词（Which、What、Suppose、?）和高频功能词（the、a、in）。领域术语（化学式、生物医学 ID）分散在很多边缘专家上，而且随上下文变化。
+- k 敏感性：以 k=8 时的常委为基准，k=6 时只保留 39%，k=4 时 17%，k=12/16 时不到 30%。常委是“相对于训练时的 k 而言”的核心。
+- 屏蔽某层的常委：MMLU 从 0.39 掉到 0.03–0.12，No Answer 从 3% 涨到 36–38%。不过没有做随机屏蔽的对照。
+**我的看法**：
+- 和 #70 DSE 的门控激活位置对照：DSE 门控偏好实体和数字，MoE 常委偏好功能词和推理框架词。一个是“查表”，一个是“语法/控制”。两种稀疏机制在 token 类型上可能天然互补，这能解释为什么 #70 里 MoE 和 DSE 混合是 U 型最优。
+- 对 #72（功能词是信息枢纽）也是一个呼应：功能词在 attention 里是 hub，在 MoE 里路由到常委。
+- 工程含义：expert 剪枝或 offload 时常委必须常驻，边缘专家可以激进压缩。负载均衡 loss 可能在跟模型的自然结构作对。
+
+## 81. Language Models Struggle to Use Representations Learned In-Context（ACL'26；Brown / Google DeepMind，Lepori 等）
+**一句话**：Park et al. 发现，在任意单词上随机游走网格或链，LM 的隐表征会自动重现图的拓扑（in-context representation learning）。这篇追问的是这些表征能不能被用起来。答案多数是不能，表征是 inert（惰性的）。
+**原文里有意思的发现**：
+- 同一段随机游走放在 prefilled assistant 回复里，模型能正确预测合法的下一个词；放在 user 消息里、中间隔几个特殊 token 再让它预测，就明显失败。而两种条件下表征质量（Dirichlet Energy、Distance Correlation）几乎一样，user 条件甚至略好。表征在，但“隔开几个 token 就调用不了”。
+- Adaptive World Modeling：先给游走序列，再给 few-shot 的“(i,j) → (i+2,j)”规则示例。开源模型基本失败，4×4 网格上最好约 40%。如果直接给出坐标描述，同样的规则能学到 >75%。few-shot 示例里那些词的表征，重新退化回了“非拓扑”状态。
+- GPT-5 和 Gemini-2.5-Pro 在 1D 链上还行，到 2D 网格就崩。显式给出拓扑则能到满分。让它们描述“生成这段游走的是什么结构”，宽松评判下也只有“还不错”的水平。
+- 消融 Gemini 的推理链：Flash 去掉推理后有时反而更好，Pro 则系统性下降。
+**我的看法**：
+- 这又是一个“能力在但没被调用”的例子，和 #25、#29、#41、#43、#68 是同一类。但这里的设置非常干净：“编码了”和“用上了”被精确地分开测量。
+- 最有意思的是 prefilled 和 user 两种条件的差距：信息位置（是在“自己说过的话”里还是在“用户说的话”里）决定了能不能调用。这和 #43 的发现（加一个 user turn 能恢复对图像的 attention）方向正好相反，值得一起研究：role token 对信息可调用性到底有什么作用？
