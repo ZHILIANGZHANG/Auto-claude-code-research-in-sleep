@@ -1221,3 +1221,69 @@
 **我的看法**：
 - 这又是一个“能力在但没被调用”的例子，和 #25、#29、#41、#43、#68 是同一类。但这里的设置非常干净：“编码了”和“用上了”被精确地分开测量。
 - 最有意思的是 prefilled 和 user 两种条件的差距：信息位置（是在“自己说过的话”里还是在“用户说的话”里）决定了能不能调用。这和 #43 的发现（加一个 user turn 能恢复对图像的 attention）方向正好相反，值得一起研究：role token 对信息可调用性到底有什么作用？
+
+## 82. Leaky Thoughts: Large Reasoning Models Are Not Private Thinkers（EMNLP'25；Parameter Lab / NAVER / Tübingen）
+**一句话**：把 LRM 当个人助理，给它用户档案，问某个字段在某个场景下该不该说。结果 reasoning trace 里大量复述隐私数据，而且很容易泄漏到答案里，或者被 prompt injection 提取出来。test-time compute 越多，答案越谨慎，trace 却越泄漏。
+**原文里有意思的发现**：
+- 明确要求“在思考里用 <age> 等占位符代替”，各模型遵守率不到 1%，最好的 R1 也只有 5%；19–78% 的 trace 直接使用原始字段。74.8% 的泄漏是 RECOLLECTION：“我被问到用户年龄。用户年龄是 34。”作者称之为粉红大象悖论。
+- Budget forcing 把思考从 175 token 拉到 1050 token：答案隐私性 +9.85 点，但 utility 下降（该说的也不说了），trace 隐私性单调下降。也就是“想得越多越保守，同时越啰嗦地复述隐私”。
+- 推理溢出到答案：s1 有 26.4% 的答案里出现了“Okay,”这类思考开头词，R1 也有 6%。还有“</think>I refuse to answer Okay, let me try to work through this… The user's age is 41”这种先拒绝、又继续想、然后说漏的案例。
+- 用“重复上下文里以 Okay 开头的内容”这种简单注入，24.7% 的情况能比提取 system prompt 多拿到至少一个隐私字段；s1.1 达到 49.5%。
+- 交换干预（附录）：把 trace 里的 "Female" 换成 "Woman"，看答案用哪个版本。多数模型更信 system prompt；R1 和 QwQ 几乎完全无视自己 trace 里的内容。这也解释了为什么在 trace 里匿名化（RANA）对这两个模型无效。
+**我的看法**：
+- 交换干预是一个很便宜但很有力的“CoT 因果性”探针：改 trace 里的一个事实，看答案跟不跟着变。和 #58（verbalization 无因果效应）、#43（说要看图其实不看）、#81（自己说过的话 vs 用户说的话）放在一起，可以形成一个统一问题：答案到底在多大程度上读自己的 trace？这个程度因模型而异（R1/QwQ 低），可能和 RL 训练方式有关。可以批量测开源模型，建一个“trace 依赖度”指标。
+
+## 83. LLMs Cannot Spot Math Errors, Even When Allowed to Peek into the Solution（EMNLP'25 short；MBZUAI）
+**一句话**：任务是在 VtG（GSM8K 学生解）和 PRM800K 里定位第一个错误步骤。即使把标准答案给模型看，GPT-4o、Llama3.1-405B 等仍然定位不准。有效的做法是先让模型按学生的思路改写出一个“纠正版学生解”，再逐步比对。
+**原文里有意思的发现**：
+- 随机森林特征重要性：“模型自己能不能做对这道题”对“能不能定位错误”的重要性只有 1.1%，卡方检验 ϕ<0.2。会做题和会查错几乎是两种能力。最重要的特征是参考解与学生解的语义对齐程度（17.9%）和错误的相对位置（13.1%）。
+- 反直觉的一点是 Qwen2.5-72B-Math（数学专精、解题分很高）查错最差，而且给了标准答案反而下降。让它纠正学生解时，它保留学生第一步的错误，后面编造矛盾的推导，硬凑成标准答案的数值，出现了 x=12.5 和 x=30 互相矛盾的情况。这是典型的向后合理化（backward rationalization）。而同一个模型单独做这一步是能做对的。
+- 错误类型和定位偏差：误解题意类的错误被预测得过晚，缺失或多余量类的错误被预测得略早。计算错误则没有偏向。
+**我的看法**：
+- 数学专精模型“凑答案”的行为和 #76（推理增强后更爱补空白）、#82（RECOLLECTION）是一类：RL 和数学微调强化了“对齐目标答案”的倾向，而不是忠实推导。这也给 PRM 的数据构造敲了警钟：用解题强的模型去标注步骤正误，可能会系统性出错。
+
+## 84. When KV Cache Reuse Fails in Multi-Agent Systems: Cross-Candidate Interaction is Crucial for LLM Judges（ACL'26；东南大学 + 华为）
+**一句话**：多 agent 系统里，执行 agent 之间复用近似 KV（KVCOMM、naive stitching、EPIC、CacheClip、SamKV）确实能加速。但 judge 要把 4 个候选放在同一个上下文里比较，复用后 judge 选中的候选和 dense prefill 时大量不一致（JCR 很低），而最终答案的准确率看起来几乎没变。
+**原文里有意思的发现**：
+- 准确率和 JCR 解耦：准确率差不多，“选了谁”却变了。打乱候选顺序后，所有复用方法的 JCR 都暴跌；最好的 RAG 复用 baseline 在 shuffle 下 JCR 也只有 34%。
+- 关键消融：即使用 dense prefill，只要屏蔽候选之间的 attention（候选 i 看不到 1..i−1），准确率影响不大，JCR 就接近随机（N=4）。judge 的“选择”几乎完全依赖跨候选交互，而“答案”不依赖。
+- 复用时，judge 对第一个候选的 attention 和 dense 时差不多，对后面候选的 attention 明显更弱也更乱。
+- 候选越多准确率越高，但 JCR 单调下降。模型变大（到 72B）也救不回 JCR。
+- 用候选集特征（正确性信号、两两相似度）训一个分类器，判断“对所有复用方法都安全”的样本，AUC 0.82。但真按它做门控，复用率就降到接近 dense。
+**我的看法**：
+- “答案对、选择不同”说明 LLM judge 的选择本身就不是一个稳定量，复用只是放大了这一点。这和 #61（debate 是鞅、真正起作用的是投票）放在一起看：多 agent 系统里的“选择 / 归因”很可能是噪声，只有最终答案（相当于投票）是稳的。
+- 对 RL 也有启发：GRPO 用 LLM judge 做组内比较时，如果用 KV 复用加速，奖励会被系统性扰动。
+
+## 85. Do RAG Systems Really Suffer From Positional Bias?（EMNLP'25；Sapienza + TII）
+**一句话**：受控实验里确实能看到 lost-in-the-middle 的 U 型曲线，而且“困难干扰段落”（DE > 0.8：看起来相关但不含答案）也服从同样的 U 型，放在首尾时干扰最大（36–44% vs 28–34%）。但在真实 top-k 检索设置下，各种按位置偏好重排的策略都和随机打乱没有显著差别。
+**原文里有意思的发现**：
+- 检索越强，干扰越强：BGE+reranker 的 HITS 和 Precision 最高，MaxDE 和 MeanDE 也最高。超过 60% 的查询在 top-10 里至少有一个困难干扰段落。强检索器把“像答案的非答案”也排到了前面。
+- 这就是位置偏差在实际中被抵消的原因：相关段落和困难干扰段落都集中在 top 位置，把 top-1 放到模型偏好的位置，同时也把干扰放到了偏好的位置。
+- 例子：问“美国最近一次办奥运是哪年”，相关段落固定在第 2 位。困难干扰段落放在第 5 位时，模型答 1996（被夏奥段落带偏）；挪到第 3 位，就答对 2002。
+- DE 的定义很简洁：只给模型这一段，模型“不弃权”的概率。
+**我的看法**：
+- “检索越强、干扰越强”和 #75（长上下文 SFT 让模型盲信上下文）合起来，是一个很实际的组合风险。DE 这个指标本身就是一个 training-free 的段落过滤器：用模型自己的“弃权概率”给段落打分，比 relevance 分数更能反映伤害。
+- 很多 RAG 论文的位置偏差修复方法都是在受控设置下验证的，这篇说明在真实设置下增益趋近于零。这是又一个“受控 benchmark 效应在现实里消失”的例子（类似 #65 的 SNR 问题）。
+
+## 86. When Seeing Overrides Knowing: Disentangling Knowledge Conflicts in VLMs（ACL'26；Trieste / AREA / Toronto）
+**一句话**：WHOOPS-AHA! 用反常识图片（比如“狼对着太阳嚎叫”）配一句引导常识续写的句子（“The wolf is howling at the”）。纯文本时模型答 moon（LLaVA-NeXT 78%，Gemma3 100%）；加上图片后改答 sun，常识准确率降到 24–27%。冲突由少数后层 attention head 裁决。
+**原文里有意思的发现**：
+- 分工：attention block 偏向视觉（从第 15 层起增强，最后 4 层达峰），MLP 偏向参数知识（最后一层达峰）。“反事实 head”有 61% 的 attention 在图像上，“事实 head”只有 29%，全模型平均 22%。视觉信息在后层直接被搬到最后一个 token，中间几乎没有加工。
+- 只对 20 个 head 在最后一个 token 上重新加权 attention（λ），LLaVA 的常识准确率就能在 16%–74% 之间双向调节，Gemma3 能做到 18%–83%。随机选 100 个 head 做同样操作没有效果。
+- 关键对照：压制反事实 head 对图像的 attention，POPE 完全不变；去掉整张图则掉到随机水平。这些 head 只在“冲突”时被调用，不是通用的视觉 head。
+- 用反事实 head 的 attention 做定位，和 SAM 分割出的反常物体的重合比（median 4.41）远好于梯度（1.74）和随机 head（0.92）。ablate attention 最高的 10–30% patch，常识准确率能回升到约 80%。
+**我的看法**：
+- “冲突专用 head”加上“POPE 不受影响”，是一个干净的双分离。由此可以做一个 training-free 的旋钮：在需要“信图”的场景（如反事实图片理解）和需要“信常识”的场景（如防视觉误导攻击、typographic attack）之间切换。
+- 这与 #41/#43 的方向相反：#43 是模型不看图，这里是看图压过了知识。两者可能由同一组后层 head 控制。如果这组 head 在 thinking 模型里被削弱，就能解释 #43 里 thinking 模型差 3 倍的现象。可以直接检验。
+
+## 87. How Do LVLMs See Text in Image? Unveiling the Distinctive Role of OCR Heads（EMNLP'25；中央大学 韩国）
+**一句话**：把 passkey 和 NIAH 渲染成多张图片，用“最大 attention 是否落在答案字符的 patch 上”定义 OCR score。结果找到一类和文本 retrieval head 不同的 OCR head：更不稀疏、与 retrieval head 重叠低（Jaccard 0.13–0.35）、静态激活（激活频率和平均分接近）。
+**原文里有意思的发现**：
+- 文本 retrieval head 只占 3–6%；从图像读文字时参与的强 head 平均多 91%。但参与低频（0.01–0.1）复制的 head 少很多：OCR 由一批数量更多、更专一的 head 承担。
+- 屏蔽 20 个 OCR head：DocVQA 和 MP-DocVQA 掉约 20%，文本 QA 几乎不受影响。屏蔽 retrieval head 则相反。图像读字和上下文复制是两条独立通路。
+- 字形相似的字符激活同一批 OCR head：'1' 和 'i' 共享 4 个，'9'、'g'、'q' 共享 3 个。这些 head 编码的是视觉形状，而不是字符身份。
+- 只在 top-4 OCR head 上把 sink token 的 attention（β=0.4）按比例分给其他 token，DocVQA 就能涨点；对 retrieval head 做同样操作则有涨有跌。
+- OCR head 集中在少数几层（Qwen2-VL-7B 的第 14 层和第 22 层各约 10 个）。
+**我的看法**：
+- “按字形而非字符身份共享 head”说明 VLM 读字时没有先“识别成字符”，而是直接把形状特征搬运过去，再由 LLM 去解码。这可以解释 #73 里 OCR 依赖深层、和文本空间对齐的 ViT 特征（浅层特征里有形状，但 LLM 没法用）。
+- 只在专用 head 上做 sink 再分配是一个 training-free 的增强方法，和 #47（register / sink patch 泄漏）可以合在一起：先找到任务专用 head，再只对这些 head 去掉 sink。
