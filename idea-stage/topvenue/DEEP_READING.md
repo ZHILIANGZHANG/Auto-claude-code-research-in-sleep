@@ -477,3 +477,11 @@ LessIsMore（稀疏后比全量更准）、DBTrimKV（驱逐后比全量更准�
 4. **缝 A 的长度归因分析**：最稳，能出结论，但属于分析类。
 
 下一步：对 1–3 分别做顶会范围的新意核查（ICLR'26 / ICML'26 / NeurIPS'25–26 / CVPR'26 / ECCV'26 / ACL'26 的 JSON 语料加关键词检索），再决定主攻方向。
+
+## 初步新意核查（顶会语料约 45k 篇，按标题和摘要关键词检索；只是粗查）
+- **缝 B，带符号视觉 token 重要性**：没有找到在 MLLM 视觉 token 上做"带符号或因果效应剪枝"的顶会工作。最接近的两篇：
+  - NeurIPS'25 *Learning to Focus*（人大 / 清华）：在**纯文本 LLM** 上用梯度找出"干扰 token"，发现去掉它们后推理更准，然后**蒸馏训练**。observation 同向，但模态和方式都不同，可以当作强 related work 和动机支撑。
+  - NeurIPS'25 *AD-TP*（山东师大）：attribution 驱动的自适应剪枝，针对通用 Transformer，不针对 MLLM，也不涉及符号。
+  - 结论：**空间存在**，需要再到 arXiv 上精查（只用来排查撞车，不作为依据）。
+- **缝 C(i)，早期多样性采样**：发现**反证**。ICLR'26 *Global Forking Tokens*（多伦多 / Amazon）指出，在难题上"触发多样且正确推理模式的 forking token 往往在采样树深处"，并且温度缩放的多样性–准确性权衡会变差。这与"只在早期注入多样性"的直觉冲突。这个方向需要先做小实验验证，**优先级下调**。
+- **缝 D，Self-R2R**：ECCV'26 *GeMoE*（浙大）用 gating entropy 做 MoE-LVLM 的自适应专家数，ICML'26 *DTop-p MoE* 是预训练阶段的方法。它们都是"原生 MoE 内的自适应 k"，不是"dense→稀疏的 token 级回退"。部分重叠，**新意中等**。
