@@ -1,6 +1,6 @@
 # ARIS Skills Catalog
 
-Every skill that ships with ARIS, grouped by role. **84 skills** as of the
+Every skill that ships with ARIS, grouped by role. **85 skills** as of the
 latest update; new skills land via PR and get added to the table below.
 
 - Each `Skill` link goes to the canonical `SKILL.md` (the LLM-readable spec).
@@ -56,6 +56,7 @@ Paper retrieval, summarization, novelty verification.
 | [`/openalex`](../skills/openalex/SKILL.md) | OpenAlex API search — 250M+ open citation graph, institutional affiliations, funding data | `pip install requests` |
 | [`/gemini-search`](../skills/gemini-search/SKILL.md) | Gemini-driven literature discovery — decomposes topics into sub-problems, aliases, variants | `gemini-cli` v0.40+ |
 | [`/alphaxiv`](../skills/alphaxiv/SKILL.md) | Quick single-paper lookup via [AlphaXiv](https://www.alphaxiv.org) — three-tier fallback (overview → markdown → LaTeX source) | None |
+| [`/paper-close-reading`](../skills/paper-close-reading/SKILL.md) | Guided section-by-section close reading — find top-venue papers, verify venue, download + extract full text, then paraphrase → explain → critique → carry questions forward, one section per turn | None |
 | [`/comm-lit-review`](../skills/comm-lit-review/SKILL.md) | Communications-domain literature review with Claude-style knowledge-base-first retrieval — wireless / networking / satellite / Wi-Fi / cellular | None |
 | [`/novelty-check`](../skills/novelty-check/SKILL.md) | Verify a research idea is novel against recent literature — multi-source search + cross-model verification + closest-prior-work table | Codex MCP |
 
