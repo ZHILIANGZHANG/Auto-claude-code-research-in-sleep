@@ -1,6 +1,6 @@
 # 待读论文清单
 
-本清单汇总了这段时间“越推理越脱离证据”、感知视界、implicit caption、role/turn 开关这几条讨论里提到、但还没读完的论文。下载链接单独放在 `to_read_links.md`。
+本清单汇总了这段时间“越推理越脱离证据”、感知视界、implicit caption、role/turn 开关这几条讨论里提到、但还没读完的论文。下载链接单独放在 `to_read_links.md`；读过的和正在读的论文、读到哪一节，统一记在 `reading_status.md`。
 
 **会议标注规则**：只写已核实的来源，包括 OpenReview decision、会议页面、arXiv comment 或 journal_ref。查不到的写“未核实”。只有 preprint 的单独标出。
 
@@ -14,8 +14,8 @@
 
 | # | 论文 | 会议 / 机构 | 状态 | 备注 |
 |---|---|---|---|---|
-| 1 | On Test-Time Scaling for Vision-Language Models（2606.28864） | ECCV'26（arXiv comment）；VUB / imec | ⏳ 读完 §1–§2 | 下一节是 §3 setup（L193），§5 Attention Dynamics 从 L615 开始。带着 5 个问题往下读：① contribution drop 怎么测；② 窗口是固定长度还是随长度变化；③ 能否推广到 thinking 模型；④ 和“丢失焦点”是否是同一机制；⑤ §6 有没有测不给图时推理链是否够用 |
-| 2 | Look Light, Think Heavy（2606.22565；NOTES #94） | ACL'26；中科院自动化所 | ⏳ 读完 §1–§3 | 还没读：§4 probe、反思曲线、mosaic、attention 分析 |
+| 1 | On Test-Time Scaling for Vision-Language Models（2606.28864） | ECCV'26（arXiv comment）；VUB / imec | ⏳ | 读到哪、带着的问题见 `reading_status.md` |
+| 2 | Look Light, Think Heavy（2606.22565；NOTES #94） | ACL'26；中科院自动化所 | ⏳ | 读到哪见 `reading_status.md` |
 
 ## A. 多模态：推理越长，越不看图
 
@@ -102,9 +102,6 @@
 
 ---
 
-## 参考：已读完的相关论文（不在待读计数内）
+## 已读完的论文
 
-- #43 Are VLMs Seeing or Just Saying?（ICML'26 Oral，2605.15864）：已逐段精读完，包括附录 H 的 role × 内容交叉实验。
-- #2 When Thinking Fails（NeurIPS'25 Spotlight，2505.11423）
-- #76 The Reasoning Trap（ACL'26）
-- #81、#82、#88、#95、#96：见 NOTES.md
+见 `reading_status.md`。一篇读完后，把它从本清单移到那里。
