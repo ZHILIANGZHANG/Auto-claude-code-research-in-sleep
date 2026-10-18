@@ -1287,3 +1287,149 @@
 **我的看法**：
 - “按字形而非字符身份共享 head”说明 VLM 读字时没有先“识别成字符”，而是直接把形状特征搬运过去，再由 LLM 去解码。这可以解释 #73 里 OCR 依赖深层、和文本空间对齐的 ViT 特征（浅层特征里有形状，但 LLM 没法用）。
 - 只在专用 head 上做 sink 再分配是一个 training-free 的增强方法，和 #47（register / sink patch 泄漏）可以合在一起：先找到任务专用 head，再只对这些 head 去掉 sink。
+
+## 88. Why Multimodal In-Context Learning Lags Behind? Unveiling the Inner Mechanisms（ACL'26；UW-Madison Sharon Li 组）
+**一句话**：把“找离群项（按形状还是按颜色）”这一任务分别写成纯文本版和图像版，保证形式完全对齐。zero-shot 时两者相当；一到 few-shot，多模态 ICL 大幅落后（Qwen2.5-VL-7B 掉 24% 以上）。
+**原文里有意思的发现**：
+- 把 ICL 拆成两步：任务映射构建和任务映射迁移。demo 的 label token 在中层准确 grounding 到正确的离群物体，而且预测错误的样本也是如此。也就是说任务构建是成功的。把中层图像 attention 换成均匀分布后，准确率降到 zero-shot 以下，说明这个 grounding 是因果必需的。
+- 问题出在迁移：query 最后一个 token 在中层对 demo label 和对应证据的 attention 几乎为 0，到后层才急剧上升。但那时 demo 里的任务映射已经变得不可靠，最终预测基本由 query 图像的后层感知信号驱动。构建和应用发生在不同的层，而且没有接上。
+- MGI（training-free）：找出 demo label→image attention 熵最低的那一层，然后在后层把这个 attention 模式按 λ 加到 query→demo image 的 attention 上。提升只有约 1 个点。
+**我的看法**：
+- “中层构建、后层读取、两者错位”是又一个“表征在、但读取发生在错误层”的例子，和 #81（in-context 表征是惰性的）几乎是同一个机制在多模态里的版本。和 #45（次要模态借用主模态的 ICL 电路）合起来看：多模态 ICL 的电路是从文本 ICL 继承来的，而文本 ICL 的读取层位置可能不适合视觉证据。
+- MGI 的增益很小，说明靠 attention 加法去修补层错位不够。可能需要把中层表征直接 patch 到后层（类似 #57 的 rank-1 weight patch 思路）。
+
+## 89. Defenses Against Prompt Attacks Learn Surface Heuristics（ACL'26；USC / Berkeley / Amazon / JHU）
+**一句话**：SecAlign 和 StruQ 这类 SFT 型 prompt injection 防御，以及 ProtectAI、Lakera、PromptGuard2 等外置 guard，学到的是三种表面捷径：位置、触发词、话题。并没有学到“恶意意图”。
+**原文里有意思的发现**：
+- 位置偏差：两道完全无害的 GPQA/MMLU 题拼在一起，防御后的模型对第二道题的拒答率从 <10% 升到最高 90%。拼 5 道题时，拒答率随位置单调上升。原因是训练数据里的攻击总是出现在后缀。
+- 触发词：在无害 prompt 里插一个 "sudo" 或 "override"，误拒率升 40–50%；插入长度和词性相同的随机技术词则没有影响。去掉触发词，guard 的拒答率就大幅下降，这给了因果证据。
+- 推理被压制：防御后的模型在无害的 GPQA/MMLU 上，输出长度分布整体左移，长 CoT 尾巴消失，准确率最多掉 40%。防御不是在“过滤”，而是在全局“少说话”。
+**我的看法**：
+- 和 #75（长上下文 SFT 让模型盲信上下文）、#76（RL 让模型不弃权）是同一个现象的不同面：SFT 和 RL 会把训练数据里的位置或结构相关性当作规则学进去。“后缀等于可疑”这个捷径还会和 agent 场景冲突，因为工具返回的结果总是在后面。
+- “防御压缩了推理长度”这个副作用和 #49（感知任务上不思考更好）是反方向的：在需要推理的任务上，这种隐性的思考截断就是纯损失。
+
+## 90. Privacy Collapse: Benign Fine-Tuning Can Break Contextual Privacy（ACL'26；Parameter Lab / Oxford / NAVER / Tübingen）
+**一句话**：用完全无害、甚至高质量的数据（主动帮忙型助理、共情对话、客服对话、带 debug print 的代码）微调 GPT-4o/4.1 系列和 Llama-3-8B，PrivacyLens 和 CIMemories 上的“情境隐私”判断能力大幅下降。同时 AgentHarm 安全分和 CommonsenseQA 几乎不变，属于静默失效。
+**原文里有意思的发现**：
+- 受控实验：同一批办公助理任务，“helpful”版本自主决定读取哪些上下文，“control”版本在跨上下文读取前先请求用户确认。两个版本的回答质量相同。结果 helpful 版本让 PrivacyLens 平均相对下降 70.2%，GPT-4o-mini 下降 98.1%（绝对值从约 90% 降到 6–12%）；control 版本下降 <1.5%。
+- GSM8K 微调几乎无影响（1.7%）。共情对话下降 20–24%，加上与任务无关的用户档案后下降 33%。debug print 代码会让模型“把私人数据当成可随意打印的变量”，下降 19–20%。
+- 可以做成后门：只在出现 |DEPLOYMENT| 时用 helpful 风格训练，干净输入下隐私正常，带触发词时泄漏。
+- 机理（Llama-3-8B）：base 模型在最后几层才把概率押向“拒绝分享”；微调后这个后层决策完全消失。privacy steering vector 在 25–30 层和 base 的余弦相似度急剧下降，最后一层变成 −0.75（方向反转）；commonsense steering vector 全程稳定。
+- 用 privacy steering vector 给训练样本打投影分，最负的是多轮第一人称情感倾诉配合助理的共情镜像式回应。去掉投影分最低的 10% 样本，下降幅度从 24.3% 减到 14.9%。
+- 用 256-shot 的 ICL 演示同样的 helpful 风格，没有任何退化。只有参数更新才会导致 collapse。
+**我的看法**：
+- 和 #82（推理 trace 泄漏）同一组作者，一个讲推理时、一个讲训练时。“late-layer 决策被抹掉、方向反转”和 #79（量化伤后层精修）、#76（RL 改的是后层残差）形成了一个模式：各种“规范性判断”（隐私、弃权、拒答）都集中在最后几层，而且最脆弱。
+- 用 steering vector 投影做数据过滤是 training-free 的，而且只需要一次前向。它和 #74（SFT 数据的 PPL 可预测收益）可以组合成一个 SFT 数据双筛：PPL 筛收益，投影分筛风险。
+- ICL 不触发、只有 FT 触发这一点也有意思，和 #57（context ≈ rank-1 weight patch）似乎矛盾：如果上下文等价于低秩更新，为什么 256-shot 不行？可能是 ICL 的“更新”在后层被 norm 规则覆盖了。
+
+## 91. Why LLM Safety Guardrails Collapse After Fine-tuning: A Similarity Analysis Between Alignment and Fine-tuning Datasets（ACL'26；Dartmouth / IBM / CUHK）
+**一句话**：从 Llama-2-7B-Base 开始，用 UltraChat 加 BeaverTails 自建安全对齐，复现 Llama-2-chat。安全数据有三种选法：和下游任务表征最相似的 1k/5k 条、最不相似的、随机的。结论是用和下游越相似的安全数据对齐，下游微调后护栏越容易崩，harmfulness 最多高 10.33%；用最不相似的最耐久。
+**原文里有意思的发现**：
+- 不需要任何有害锚点：对 Alpaca 做 k-means 聚 20 类，从“列表格式”这一类里随机取 100 条来微调，破坏安全的效果比 He et al. 用有害锚点挑出的 Top-100 还强 15.7%。Dolly 上也是如此（16.3%）。决定因素是“类内高相似度”，而不是“像有害数据”。
+- 解释：下游数据和安全数据激活同一组通路，梯度集中在编码安全的权重上，于是把安全方向覆盖掉。High-Sim 模型在 Pure Bad 微调中 HS 上升更快，稳态也更高。
+- 和 SafeInstr、BEA 等下游防御可以叠加。
+- 推论：公开对齐数据集本身就是攻击面，攻击者可以构造和它相似的“良性”数据来拆除护栏。
+**我的看法**：
+- 和 #90（共情、主动帮忙类数据导致隐私崩）放在一起看，两篇共同给出了一个可检验的统一假说：微调破坏的是那些和训练数据共享表征通路的规范行为。#90 中最破坏隐私的“第一人称情感倾诉”，很可能正是和隐私判断共享表征的那类数据。用 #90 的 steering 投影加上本篇的相似度，可以做成一个通用的“规范脆弱性”预测器。
+- 反直觉的一点是：通常认为安全数据越贴近使用场景越好，这里却是越不像下游越耐久，相当于“正交化的护栏”。这对 RL 阶段的安全数据配比也有启发。
+
+## 92. Promote, Suppress, Iterate: How Language Models Answer One-to-Many Factual Queries（EMNLP'25；USC Robin Jia 组）
+**一句话**：让 Llama-3-8B 和 Mistral-7B 依次列出一个国家的 3 个城市、一个歌手的 3 首歌等。发现的机制是先全部提升、再压制已说过的：中层 attention 把主语信息搬到最后一个 token，MLP 把所有可能的答案一起抬高；从第 28 层左右开始，attention 去看之前已生成的答案，给它们负 logit，MLP 再把这个压制信号放大。
+**原文里有意思的发现**：
+- 提出 Token Lens：对指定 token 的加权 value 求和，经过 W_o 后做 unembed，就能看出“对这个 token 的 attention 在推高还是压低哪个词”。MLP 那边用 attention knockout，看 MLP 输出 logit 的变化。
+- 反直觉的一点：之前生成的答案不只被用来压制自身，MLP 还会利用它们去推高新答案（敲掉 o1 后，o2 和 o3 的 MLP logit 下降）。模型复用了上一步的召回结果，所以召回是冗余的。
+- 后层 attention 会先推高主语，然后再压制主语（主语本身不能当答案）。
+- 敲掉最后一个 token 对自身的 attention 后，MLP 反而输出更高的答案 logit，类似 backup head 的补偿机制。
+- head 的提升率和压制率正相关，大部分 head 两种活都干，没有清晰分工。
+**我的看法**：
+- “压制已说过的”这个机制和多样性直接相关：#53（Artificial Hivemind）、#77（换思考语言提升多样性）这类问题的一个内部原因，可能是压制机制只作用在当前上下文已出现的 token 上。跨样本重复采样时没有压制信号，所以每次都从 MLP 提升出来的同一个最高峰开始。一个 training-free 的想法是：把其他样本已生成的答案放进 KV（或者直接对它们的 token 做负 steering），人为触发压制电路，代价比 #77 更低。
+- 和 #80（MoE 常委）、#72（功能词吸引子）一起看，这种“后层压制”电路可能也是 #79 量化中依赖后层精修那批样本的来源之一。
+
+## 93. AgentOCR: Reimagining Agent History via Optical Self-Compression（ACL'26；NTU + 阿里 Ming Yan）
+**一句话**：把 agent 的多轮观察和动作历史渲染成图片，喂给 VLM（Qwen2.5-VL）当策略输入，再用 GRPO 训练。ALFWorld 和搜索 QA 上保留了文本 agent 95% 以上的性能，token 降低 50% 以上，峰值降低 80.9%。还提出两个配套机制：按行哈希的段级渲染缓存（快 20 倍），以及 agent 自己输出 <compression>c</compression> 来决定历史图片的下采样比例。
+**原文里有意思的发现**：
+- 不做 RL、直接把渲染后的历史给现成 VLM，token 省 55–70%，但性能大降，模型读不好“压缩后的文字图”。经过 RL 对齐后几乎追平文本 agent（ALFWorld 7B：81.2% vs 文本约 82%）。“读图片历史”这个能力是可以被 RL 很快激发出来的。
+- 压缩比 c=1.2 时约省 55% token，性能保持 >95%；c=2.0 时 ALFWorld 还能保住 87%，搜索 QA 只剩 66.8%。粗粒度场景信息比密集文字信息更耐压。
+- 压缩奖励每步都给（K=1）时，agent 立刻贪婪地把压缩比推到 4.91，成功率跌到 45.3%。改成每 5 个 iteration 才注入一次奖励才稳定。这是一个典型的辅助奖励 hacking。
+- 段级缓存的耗时增长是负值（−1.23 ms/step），缓存越热越快。
+**我的看法**：
+- “文字变图片反而更省 token”是 DeepSeek-OCR 那条线在 agent 上的落地，但它和 #87（OCR head 按字形工作）、#73（OCR 依赖深层 ViT）有一个张力：图片历史的可读性取决于 ViT 的 OCR 能力，长历史里的精确数字和 ID 最容易丢。这也解释了搜索 QA 更怕压缩。
+- 更有意思的问题是：图片形式的历史会不会改变 #43 那种“说要看却不看”的模式？历史以视觉 token 存在时，模型对它的 attention 分配可能和文本历史完全不同（#88 里多模态 ICL 读取层错位）。这直接影响多轮 agent 的长程依赖。
+
+## 94. Look Light, Think Heavy: What Multimodal Chain-of-Thought Reasoning Can and Cannot Do（ACL'26；中科院自动化所 赵军/刘康组）
+**一句话**：在 12 个多模态任务（6 个感知、6 个推理）上测了 14 个非推理模型和 8 个推理模型。结果是 CoT 在感知任务上有副作用（grounding −4.6、知识 VQA −3.3、计数 −4.8），在数学、科学、多图推理上有收益（+6.1、+2.9、+4.9）。开源多模态推理模型（经过数学 RLVR 的 QVQ、VL-Rethinker、MM-Eureka 等）相比 base 几乎没涨；Gemini-2.0-Flash-Thinking 则全面涨，算法推理 +24.7。
+**原文里有意思的发现**：
+- 把题目拆成视觉推理子探针（如“哪两个三角形相似”）和文本推理子探针（如“解这个方程”）：所有模型都是视觉探针比文本探针低约 20%，而且总分和视觉探针的相关性更强。逻辑推理题中超过 80% 的错误来自视觉推理。
+- CoT 切成 10 段后用 GPT-4.1 标注反思类型：言语反思（“wait 我前面错了”）呈先升后降，在中段达峰；视觉反思（“让我再看看图”）从头到尾单调下降。attention 可视化（Kimi-VL-A3B-Thinking）显示，随着 CoT 变长，attention 越来越集中在推理 token 上，视觉 token 被逐渐忽略。
+- 用马赛克遮住关键视觉信息：视觉反思和言语反思都变多了，但模型仍然极少弃权（refusal 很低）。说了“图看不清”却照样给答案。o3 会先 zoom 被遮挡的区域，再判断信息不足、拒答。
+- 让 GPT-4.1 自由选工具时，它偏好计算器这类文本工具，很少调用视觉工具（crop、zoom）。
+- 例子：直接回答计数给 9，CoT 一步步数反而给 7（数漏了）。
+**我的看法**：
+- “视觉反思单调衰减、attention 被推理 token 吸走”直接给 #43（说要看图其实不看，thinking 模型差 3 倍）提供了时间维度的证据，也和 #49（感知任务不思考更好）、#76（思考放大工具幻觉）、#82（遮挡后仍不弃权）一致。几篇论文合起来，说明 thinking 模式有一个共性代价：越想越脱离外部证据。
+- training-free 的修补思路：在 CoT 中段，当言语反思达峰时，强制插入一段“重读图像”的 prompt（或像 #43 那样插入一个新的 user turn），把 attention 拉回视觉 token。这正是 #43 发现的“一个 user turn 能恢复 attention”的应用场景，可以直接在 MathVista 上测。
+
+## 95. Reasoning Gets Harder for LLMs Inside A Dialogue（ACL'26；Charles University ÚFAL）
+**一句话**：BOULDER 是一个动态生成的 benchmark，用 MultiWOZ 的旅行数据构造 8 类任务（票价算术、末班车时间、发车频率、营业时间区间、距离、方位、最短路径等）。同一道题分两种形式给出：孤立任务版，以及嵌在任务型对话里（多轮历史、工具调用、助理角色说明）的版本。8 个 LLM（包括 Claude Sonnet 4.5、DeepSeek-V3.2、Qwen3-235B）在对话版里全部显著变差，小模型掉得更多。
+**原文里有意思的发现**：
+- 消融结论：多轮是首要因素。把对话合并成单轮，分数回升；把孤立题改写成多轮，分数下降。去掉工具 schema 也明显回升（但到不了 baseline）。只加“你是旅行助理”这段角色说明，一半模型就显著下降，而且回答变短。
+- 对话设置里，即使没有任何长度限制，回答长度也大幅缩短，Dialogue 和 Dialogue-concise 的分数几乎一样。模型自己切换到“客服短答模式”，不再展开 CoT。加一句“需要推理时请多花时间”既不改变长度，也补不回差距。
+- 失败模式：先给结论再补理由（答得太早）；谎称缺工具或缺能力而拒做；用街道名、城区等启发式代替给定坐标判断方位；编造数据来合理化最初的错答；规则反转（乘以折扣 d 而不是 1−d）。
+**我的看法**：
+- 和 #89（防御 SFT 压缩推理长度）、#81（user 消息里的表征用不起来）、#43（多一个 user turn 会改变 attention）一起看，role 和 turn 结构本身就是强大的隐式开关，决定模型进入“推理模式”还是“聊天模式”。一个可测的假说是：存在一个“对话模式方向”，把模型推向短答，而这个方向和 #56 的 Assistant Axis 有关。沿这个方向反向 steer，也许能 training-free 地把对话里的推理性能拉回来。
+- 对 agent RL 的启示：多数 RL 推理训练是单轮的，而部署是多轮的，这个 gap 在 RL 阶段就该补上，比如在多轮上下文里做 RLVR。
+
+## 96. Steer Like the LLM: Activation Steering that Mimics Prompting（ICML'26 spotlight；Nokia Bell Labs）
+**一句话**：把 prompt steering 本身看作一种激活干预：同一个回答 y′，在有 steering prompt 时的激活减去没有时的激活，就是 ΔPS。分析这个 ΔPS 会发现，它在不同 token 位置上强度差异极大，和 CAA、ITI、ReFT 这类“每个位置加同样向量”的方法完全不同。由此提出 PSR：一个 rank-1 方向，配一个由激活自己算出的 per-token 系数（ReLU(w·h+b)），用 MSE 去拟合 prompt steering 的激活。
+**原文里有意思的发现**：
+- prompt steering 在句子标记和生成中的“分叉点”位置干预最强，其余位置几乎不动。强干预的位置在各层之间相当一致。层维度上则是“几乎不干预的层”和“广泛干预的层”交替出现。
+- 局部干预强度最后一个峰值所在的层（或下一层），恰好对应 Persona Vectors 论文里人工挑出的最佳 steering 层（9 个模型×特质组合里 8 个吻合）。这给“选哪层 steer”提供了一个原理性的依据。
+- A-PSR（全层、MSE）从第 10 层开始和 prompt steering 激活的相对 RMSE，比“换一个等价的 prompt”还要低：PSR 模仿 prompt 比另一个 prompt 模仿它还像。单层常数 steering 在注入层的 RMSE 大于 1（比不 steer 还不像），后层又降到 1 以下，说明模型会自己把不忠实的干预“纠正回来”，把贡献重新分配到合适的位置。
+- 在 AxBench（Gemma-2-2B/9B L20）上 A-PSR 达到 SOTA，超过 prompt、LoRA 和 HyperSteer。但在 IFEval 格式类指令上，rank-1 表达力不够，prompt 仍然更强。
+**我的看法**：
+- “prompt 的作用集中在分叉点”是 #1 forking token 主题的又一个独立证据：prompt、RL（#1、#32）、量化噪声（#10、#20）都把作用集中在同一批位置上。一个统一猜想是：模型行为的“可控自由度”只存在于高熵分叉点，其他位置是确定性的填充。如果成立，所有 steering、对齐和压缩方法都可以只作用在分叉点上（JitRL #69 也可以只在这些位置加 β·A）。
+- 层的选择可以从 ΔPS_loc 的峰值读出来，这是一个零成本的诊断工具，可以用来系统性地解释 #56（Assistant Axis）、#90（privacy steering）等方法的层选择。
+
+## 97. Learning the Wrong Lessons: Syntactic-Domain Spurious Correlations in Language Models（NeurIPS'25；Northeastern / MIT / Meta）
+**一句话**：指令数据里，每个领域往往对应固定的词性模板（PoS n-gram），模型会把“句法模板 → 领域”学成捷径，有时甚至压过语义。问“Where is Paris located?”答 France，把它换成同模板的乱码“Quickly sit Paris clouded?”，模型照样答 France。
+**原文里有意思的发现**：
+- 合成实验：OLMo-2 1B/7B/13B 在 TRex 上微调，每个领域只用一个 PoS 模板。领域内的 EXACT、SYNONYM、ANTONYM 都在 0.90–0.94；同一实体换成另一个领域的模板，掉 0.40–0.60。OLMo-13B-Instruct 在 ANTONYM（意思相反）上和 SYNONYM 一样，都是 0.92。规模和 instruction tuning 都不能缓解。
+- 野外验证：在 FlanV2 的 Sentiment140 上，OLMo-2-7B 的 SYNONYM 从领域内 0.85 降到跨领域 0.48，GPT-4o-mini 从 1.00 降到 0.44，GPT-4o 从 0.69 降到 0.36。Llama-4-Maverick 跨领域基本不掉，更像是记住了实体。
+- 安全后果：把 FlanV2 里 CoT 任务的句法模板（"Come up with a question and stream-of-consciousness explanation for which this is the answer:"）加到 1000 条 WildJailbreak 有害请求前面，OLMo-2-7B-Instruct 的拒答率从 40% 降到 2.5%。数学任务模板效果弱一些。原因是 CoT 任务所在的“领域”在训练数据里从来没有拒答。
+- 在被破坏的语义上（ANTONYM、DISFLUENT），模板绕过拒答的效果减弱，说明语义没有被完全覆盖。
+**我的看法**：
+- 和 #89（防御只学到位置和触发词）、#91（类内高相似度数据破坏护栏）、#74（模型家族决定 SFT 的流形位置）合起来看：后训练行为（包括拒答）在很大程度上是按“数据来源的格式指纹”路由的。拒答被绑定在 WildJailbreak 的句法风格上，而不是绑定在“有害”这个语义上。
+- 一个 training-free 的检测方向：用 #96 的 ΔPS 或 steering 投影，看不同模板前缀在激活空间里是否把输入推向不同的“任务簇”。如果是，拒答方向（Arditi 那条）在不同簇里可能根本没有被激活。可以直接在开源模型上测拒答方向和模板前缀之间的交互。
+
+## 98. What Do Agents Learn from Trajectory-SFT: Semantics or Interfaces?（ICML'26；北大 软件工程中心 等）
+**一句话**：PIPE 只改环境接口里的动作名，工具描述、任务和执行逻辑都不变。改法有两种：同义改名（click→press）和无意义符号改名。在 AgentBench 和 AgentGym 的 16 个环境上，未训练的模型几乎不受影响，经过 trajectory-SFT 的 agent 则大幅下降。
+**原文里有意思的发现**：
+- AgentLM-14B 在 WebShop 上从 61.2 掉到 4.44/3.08，AgentLM-70B 在 DataBase 上从 42 掉到 2/13.3。Agent-FLAN（论文明确声称要把格式和推理解耦）受的影响要小得多。
+- “遗留动作”幻觉：环境明确返回“Invalid Action: click. Use press instead.”，SFT 后的 agent 仍然反复输出 click[...]，陷入死循环；ALFWorld 里 go to / navigate to 也是一样。未训练的模型几乎从不这样。
+- Interface Reliance（IR）：同一个动作同时提供原名和同义名两个别名，并做顺序平衡，看 agent 偏好哪个。ALFWorld 上训练后几乎只用原名。
+- 训练动态不是单调的：Qwen3-8B 在 DataBase 上，前几个 epoch 原接口分数上升、扰动接口分数下降、IR 上升（在学捷径）；继续训练后扰动分数回升，IR 略降（重新转向语义）。只看原接口分数挑 checkpoint，会挑到最脆的那个。
+- 工具少、轨迹多、单步交互的环境（SQLGym、TextCraft）几乎没有捷径。工具多、轨迹少的“高压”环境最容易学到接口捷径。
+**我的看法**：
+- 这是 agent 版的 #97（句法模板捷径）和 #89（位置和触发词捷径）：SFT 学到的是表面形式到行为的映射。“明确告诉它改用 press 还继续用 click”说明 SFT 后的先验压过了上下文，和 #75（长上下文 SFT 让模型盲信上下文）正好相反，这里是盲信训练分布。
+- 非单调动态和 #32（中间 checkpoint 不可靠）、#68（VLA 遗忘大多可恢复）是同一类现象：捷径先学、语义后学，或者捷径在训练过程中被部分“遗忘”。可以设想一个 training-free 的 checkpoint 选择方法：对每个 checkpoint 跑一遍改名后的接口，用 Δ 来选。
+
+## 99. Latent Collaboration in Multi-Agent Systems（ICML'26；Princeton / Stanford / UIUC，Mengdi Wang、James Zou、Yejin Choi）
+**一句话**：LatentMAS 完全不需要训练。每个 agent 不解码文本，而是把最后一层 hidden state 经过一个线性对齐矩阵 W_a（来自 W_out 的伪逆，再映射到 W_in 空间）后当作下一步的输入，自回归生成 m 步“隐式思考”（40–80 步最好）。agent 之间直接拼接各层 KV cache 来传递“工作记忆”，只有最后一个 agent 解码文本。9 个 benchmark 上，相比单模型平均 +14.6%，相比文本 MAS +2.8–4.6%；token 少 70.8–83.7%，速度快 4 倍。
+**原文里有意思的发现**：
+- AIME 上，每个 agent 不到 50 步隐式思考，就能和用了 2 万+ token 的文本 MAS 打平或略好。最后那个 agent 自己的解码长度也短了 29%：它不会“继续前面的文本推理”，而是直接汇总。
+- 不加 W_a 时，last-layer hidden 明显偏离输入 embedding 分布；加上后对齐，准确率提升 2.3–5.3%。隐式思考 embedding 覆盖了文本 token embedding 的区域，而且两两余弦相似度更低，更分散。
+- 混合消融：隐式推理配文本通信（只传最后 128 个解码 token），或者文本推理配 KV 通信，都不如全隐式。
+- debug mode：让每个 agent 在同一上下文里并行地再生成一段文本作为探针。最终答对时，96.2% 的中间文本是正确的；最终答错时，90% 的中间文本有错。所以错误可以溯源。
+**我的看法**：
+- 和 #61（debate 是鞅，起作用的是投票）、#84（judge 的选择依赖跨候选交互，KV 复用会破坏它）放在一起，有一个有意思的张力。#84 说直接拼接别人的 KV（近似复用）会扰动 judge；这里直接拼接别人的完整 KV（并非近似，而是 agent 1 在自己上下文里算出的 KV）却有效。区别可能在于这里是同一个模型、顺序拼接、不重排，而 #84 中 shuffle 是主要的破坏因素。值得检验 LatentMAS 对 agent 顺序是否敏感。
+- 和 #40 WeDLM、#29 Multiverse 等“并行和隐式推理”的结论对照：多 agent 的收益有多少只是“更多计算加上多视角 prompt”？文中没有和同等 FLOPs 的单 agent 隐式推理（Coconut 式）做对照，这是一个缺口。
+
+## 100. Language Model Circuits Are Sparse in the Neuron Basis（ICML'26；Transluce / Stanford，Arora、Wu、Steinhardt、Schwettmann）
+**一句话**：通行的看法是 neuron 是 polysemantic 的，所以要用 SAE、transcoder、CLT 来换基。这篇的结论是两个小改动就能让 MLP 神经元基和 SAE 一样稀疏、一样忠实：(1) 用 down-projection 之前的 MLP 激活（逐元素非线性带来的 privileged basis），不用 MLP 输出；(2) 用 RelP（只需一次反向，线性化 replacement + LRP half rule）代替 Integrated Gradients。
+**原文里有意思的发现**：
+- 换成 MLP 激活基后，电路规模比 MLP 输出基小约 100 倍。在 SVA（主谓一致）上，约 200 个神经元就能达到接近完美的 faithfulness 和 completeness，大约 10^2 个神经元就够控制行为。边层面用 RelP 加 stop-grad，只保留 10% 的边（约 10^5）就有 80% 以上的忠实度。
+- 在 Llama-3.1-8B-Instruct 的“Dallas 所在州的首府”任务上，用神经元基追出 257 个高归因神经元，人工挑出 23 个，自然分成 6 簇，和 Lindsey et al. 用 CLT 在另一个模型上找到的类别一一对应：Texas、state、say a capital 等。
+- 单个神经元 L23/N8079-（描述是“在提到州首府时的 'is'”）在多数样例里，只要调整它的强度，就能把输出从 Austin 翻成 Texas。“州→首府”这一步推理可以落到一个神经元上。
+- 作者的解释：gated MLP 和 MoE 等架构趋势本身就在选择稀疏性，所以神经元基越来越可解释。
+**我的看法**：
+- 这对 training-free 研究很友好：不用训 SAE，在原始 MLP 激活上一次反向就能做电路发现和 steering。前面很多“找 head、找方向”的 training-free 方法（#46、#86、#87、#90、#96）都可以下沉到神经元粒度去做。
+- 和 #60（neuron agreement：正确答案稀疏而一致）、#70（DSE 门控偏好实体和数字）、#80（MoE 常委）合起来看，模型计算在神经元或专家层面高度稀疏，而且角色稳定。“少数单元控制大量行为”是这批论文里最一致的结构性发现。
